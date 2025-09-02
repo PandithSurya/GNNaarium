@@ -1,0 +1,102 @@
+GNN-Attacks refers to a set of adversarial attack methods targeting Graph Neural Networks (GNNs). These attacks are designed to fool GNNs by manipulating 
+
+the graph structure, node features, or both — often with the goal of degrading performance in tasks like node classification, link prediction, or graph
+
+classification.
+
+What is a GNN attack?
+
+A GNN attack is a way to intentionally perturb a graph to cause a GNN model to make incorrect predictions. This is similar to adversarial examples in image
+ 
+classification (e.g., adding small noise to an image to trick a CNN).
+
+
+
+Basic Classification of GNN-Attacks:
+
+By Stage:
+
+1. Evasion Attacks (Test-Time Attacks):
+
+Modify the graph at test time.
+
+Aim: Cause misclassification without changing the training data.
+
+Example: Adding/removing edges in the test graph to mislead the model.
+
+2. Poisoning Attacks (Training-Time Attacks):
+
+Modify the graph before training.
+
+Aim: Embed harmful patterns into the data so that the model learns wrongly.
+
+
+By Attacker's Knowledge:
+
+1. White-box Attacks
+
+Full access to the GNN model (architecture, parameters, gradients).
+
+Most powerful attack setting.
+
+Example: Gradient-based attacks like FGSM or PGD on graphs.
+
+2. Black-box Attacks
+
+No access to model internals. Can only query the model (e.g., for predictions or probabilities).
+
+Often rely on transferability or surrogate models.
+
+Example: RL-S2V (reinforcement learning-based attack).
+
+By Targeting Strategy:
+
+1. Targeted Attacks
+
+Aim to misclassify a specific node or graph.
+
+Fine-grained and often stealthy.
+
+2. Untargeted Attacks
+
+Just aim to reduce overall model accuracy or performance.
+
+By Perturbation Type:
+
+1. Structure Attacks
+
+Modify graph topology (edges/nodes).
+
+Examples: adding/removing edges or nodes.
+
+2. Feature Attacks
+
+Modify node features.
+
+Examples: flipping binary features, changing numerical attributes.
+
+3. Hybrid Attacks
+
+Combine both structural and feature perturbations.
+
+Often more effective and harder to defend against.
+
+By Learning:
+
+1. Supervised Learning
+
+The model learns from labeled data — that is, each input comes with a ground truth output (label).
+
+Minimize the difference between the model’s prediction and the actual label.
+
+2. Unsupervised Learning
+
+The model learns patterns from unlabeled data — no ground truth is given.
+
+Find structure, clusters, or relationships in the data.
+
+3. Self-Supervised Learning
+
+A middle ground: the model generates its own labels from the data itself using pretext tasks.
+
+Learn useful representations without manual labeling, by solving tasks that don't need human-labeled data.
