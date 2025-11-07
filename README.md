@@ -4,7 +4,7 @@ A comprehensive platform for Graph Neural Network robustness analysis with adver
 
 ## Setup
 
-For detailed setup instructions, please see [setup.md](setup.md).
+For detailed setup instructions, please see [SETUP.md](SETUP.md).
 
 ## What You Can Do
 
