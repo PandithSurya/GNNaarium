@@ -1,0 +1,218 @@
+/* Neo-Tech Color Palette */
+:root {
+  --bg-primary: #0D1117;
+  --bg-surface: #161B22;
+  --bg-elevated: #21262D;
+  --primary: #00B8D9;
+  --accent: #8B5CF6;
+  --text-primary: #E6EDF3;
+  --text-secondary: #94A3B8;
+  --border: #30363D;
+  --border-hover: #484F58;
+}
+
+/* Global Styles */
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Background Gradients */
+.bg-neo-primary {
+  background: linear-gradient(135deg, var(--bg-primary), var(--bg-surface));
+}
+
+.bg-neo-surface {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+}
+
+.bg-neo-elevated {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
+}
+
+/* Button Styles */
+.btn-neo-primary {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: var(--text-primary);
+  border: none;
+}
+
+.btn-neo-primary:hover {
+  transform: scale(1.05);
+  box-shadow: 0 20px 25px -5px rgba(0, 184, 217, 0.3);
+}
+
+.btn-neo-secondary {
+  background-color: var(--bg-surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.btn-neo-secondary:hover {
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+}
+
+/* Tab Styles */
+.tab-neo {
+  background-color: transparent;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+}
+
+.tab-neo:hover {
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
+.tab-neo.active {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: var(--text-primary);
+  transform: scale(1.05);
+}
+
+/* Card Styles */
+.card-neo {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+}
+
+.card-neo:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-2px);
+}
+
+/* Input Styles */
+.input-neo {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+.input-neo:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(0, 184, 217, 0.1);
+}
+
+.input-neo::placeholder {
+  color: var(--text-secondary);
+}
+
+/* Icon Backgrounds */
+.icon-neo-primary {
+  background-color: var(--primary);
+}
+
+.icon-neo-accent {
+  background-color: var(--accent);
+}
+
+.icon-neo-gradient {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+}
+
+/* Text Colors */
+.text-neo-primary {
+  color: var(--text-primary);
+}
+
+.text-neo-secondary {
+  color: var(--text-secondary);
+}
+
+.text-neo-accent {
+  color: var(--accent);
+}
+
+.text-neo-primary-color {
+  color: var(--primary);
+}
+
+/* Alert Styles */
+.alert-neo-warning {
+  background-color: rgba(139, 92, 246, 0.1);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+}
+
+/* Header Styles */
+.header-neo {
+  background-color: rgba(22, 27, 34, 0.8);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+}
+
+/* Navigation Styles */
+.nav-neo {
+  background-color: rgba(22, 27, 34, 0.6);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+}
+
+/* Metric Panel Styles */
+.metric-neo {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+}
+
+.metric-neo-value {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* Form Styles */
+.form-neo {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+}
+
+.form-neo label {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.form-neo select {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+.form-neo select:focus {
+  border-color: var(--primary);
+}
+
+/* Status Indicators */
+.status-running {
+  color: var(--primary);
+}
+
+.status-complete {
+  color: #10B981;
+}
+
+.status-error {
+  color: #EF4444;
+}
+
+/* Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
