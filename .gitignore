@@ -7,6 +7,9 @@ __pycache__/
 *.so
 .pytest_cache/
 
+# Python virtual environments
+venv/
+
 # Environment variables
 .env
 
