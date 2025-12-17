@@ -22,37 +22,37 @@ const FAQAccordion = () => {
       answer: (
         <div className="space-y-4">
           <div className="overflow-x-auto">
-            <table className="w-full bg-white bg-opacity-10 rounded-lg border border-white border-opacity-20">
+            <table className="w-full bg-white bg-opacity-10 rounded-lg border border-white border-opacity-20 min-w-[600px]">
               <thead>
                 <tr className="bg-white bg-opacity-20">
-                  <th className="px-4 py-3 text-left text-white font-semibold">Model</th>
-                  <th className="px-4 py-3 text-center text-white font-semibold">Complexity</th>
-                  <th className="px-4 py-3 text-center text-white font-semibold">Attention</th>
-                  <th className="px-4 py-3 text-left text-white font-semibold">Best For</th>
-                  <th className="px-4 py-3 text-left text-white font-semibold">Speed</th>
-                  <th className="px-4 py-3 text-left text-white font-semibold">Accuracy</th>
+                  <th className="px-2 lg:px-4 py-3 text-left text-white font-semibold text-sm lg:text-base">Model</th>
+                  <th className="px-2 lg:px-4 py-3 text-center text-white font-semibold text-sm lg:text-base">Complexity</th>
+                  <th className="px-2 lg:px-4 py-3 text-center text-white font-semibold text-sm lg:text-base">Attention</th>
+                  <th className="px-2 lg:px-4 py-3 text-left text-white font-semibold text-sm lg:text-base">Best For</th>
+                  <th className="px-2 lg:px-4 py-3 text-left text-white font-semibold text-sm lg:text-base">Speed</th>
+                  <th className="px-2 lg:px-4 py-3 text-left text-white font-semibold text-sm lg:text-base">Accuracy</th>
                 </tr>
               </thead>
               <tbody>
                 <tr className="border-t border-white border-opacity-10">
-                  <td className="px-4 py-3 text-white font-medium">GCN</td>
-                  <td className="px-4 py-3 text-center"><span className="px-2 py-1 bg-green-500 text-white text-xs rounded-full">Low</span></td>
-                  <td className="px-4 py-3 text-center text-white">—</td>
-                  <td className="px-4 py-3 text-gray-100">Node Classification</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-16 bg-gray-600 rounded-full h-2">
+                  <td className="px-2 lg:px-4 py-3 text-white font-medium text-sm lg:text-base">GCN</td>
+                  <td className="px-2 lg:px-4 py-3 text-center"><span className="px-2 py-1 bg-green-500 text-white text-xs rounded-full">Low</span></td>
+                  <td className="px-2 lg:px-4 py-3 text-center text-white">—</td>
+                  <td className="px-2 lg:px-4 py-3 text-gray-100 text-sm lg:text-base">Node Classification</td>
+                  <td className="px-2 lg:px-4 py-3">
+                    <div className="flex items-center space-x-1 lg:space-x-2">
+                      <div className="w-12 lg:w-16 bg-gray-600 rounded-full h-2">
                         <div className="bg-blue-500 h-2 rounded-full" style={{width: '95%'}}></div>
                       </div>
-                      <span className="text-white text-sm">95%</span>
+                      <span className="text-white text-xs lg:text-sm">95%</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-16 bg-gray-600 rounded-full h-2">
+                  <td className="px-2 lg:px-4 py-3">
+                    <div className="flex items-center space-x-1 lg:space-x-2">
+                      <div className="w-12 lg:w-16 bg-gray-600 rounded-full h-2">
                         <div className="bg-green-500 h-2 rounded-full" style={{width: '85%'}}></div>
                       </div>
-                      <span className="text-white text-sm">85%</span>
+                      <span className="text-white text-xs lg:text-sm">85%</span>
                     </div>
                   </td>
                 </tr>
@@ -235,24 +235,25 @@ const Homepage = ({ onTryItOut, onSignIn, user, onLogout }) => {
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-black bg-opacity-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg bg-gradient-to-br from-blue-500 to-purple-600">
-                <Brain className="w-6 h-6 text-white" />
+          <div className="flex justify-between items-center py-4 lg:py-6">
+            <div className="flex items-center space-x-3 lg:space-x-4">
+              <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl flex items-center justify-center shadow-lg bg-gradient-to-br from-blue-500 to-purple-600">
+                <Brain className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
               </div>
-              <h1 className="text-2xl font-bold text-white" style={{fontFamily: 'HK Modular, sans-serif'}}>GNNaarium</h1>
+              <h1 className="text-lg lg:text-2xl font-bold text-white" style={{fontFamily: 'HK Modular, sans-serif'}}>GNNaarium</h1>
             </div>
             {!user ? (
               <button
                 onClick={onSignIn}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-6 py-2 rounded-lg font-medium text-white transition-all duration-200 flex items-center space-x-2"
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-4 lg:px-6 py-2 rounded-lg font-medium text-white transition-all duration-200 flex items-center space-x-2 text-sm lg:text-base"
               >
-                <span>Sign In</span>
+                <span className="hidden sm:inline">Sign In</span>
+                <span className="sm:hidden">Sign In</span>
               </button>
             ) : (
               <button
                 onClick={onLogout}
-                className="border border-white bg-transparent hover:bg-white hover:bg-opacity-10 px-6 py-2 rounded-lg font-medium text-white transition-all duration-200 flex items-center space-x-2"
+                className="border border-white bg-transparent hover:bg-white hover:bg-opacity-10 px-4 lg:px-6 py-2 rounded-lg font-medium text-white transition-all duration-200 flex items-center space-x-2 text-sm lg:text-base"
               >
                 <span>Logout</span>
               </button>
@@ -262,34 +263,34 @@ const Homepage = ({ onTryItOut, onSignIn, user, onLogout }) => {
       </header>
       {/* Hero Section */}
       <div className="relative overflow-hidden z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 pt-32">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16 pt-24 lg:pt-32">
           <div className="text-center">
-            <div className="flex justify-center mb-8">
+            <div className="flex justify-center mb-6 lg:mb-8">
               <div className="relative">
-                <div className="w-24 h-24 rounded-3xl flex items-center justify-center shadow-2xl bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 animate-pulse">
-                  <Network className="w-14 h-14 text-white" />
+                <div className="w-16 h-16 lg:w-24 lg:h-24 rounded-2xl lg:rounded-3xl flex items-center justify-center shadow-2xl bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 animate-pulse">
+                  <Network className="w-8 h-8 lg:w-14 lg:h-14 text-white" />
                 </div>
-                <div className="absolute -top-2 -right-2 w-8 h-8 bg-green-400 rounded-full flex items-center justify-center animate-bounce">
-                  <Zap className="w-4 h-4 text-white" />
+                <div className="absolute -top-1 -right-1 lg:-top-2 lg:-right-2 w-6 h-6 lg:w-8 lg:h-8 bg-green-400 rounded-full flex items-center justify-center animate-bounce">
+                  <Zap className="w-3 h-3 lg:w-4 lg:h-4 text-white" />
                 </div>
               </div>
             </div>
-            <h1 className="text-6xl font-bold mb-6 text-white animate-pulse">
+            <h1 className="text-3xl sm:text-4xl lg:text-6xl font-bold mb-4 lg:mb-6 text-white animate-pulse px-4">
               Graph Neural Networks
             </h1>
-            <div className="flex justify-center mb-6">
-              <div className="h-1 w-32 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full"></div>
+            <div className="flex justify-center mb-4 lg:mb-6">
+              <div className="h-1 w-24 lg:w-32 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full"></div>
             </div>
-            <p className="text-xl mb-8 max-w-3xl mx-auto leading-relaxed text-gray-100">
+            <p className="text-base lg:text-xl mb-6 lg:mb-8 max-w-3xl mx-auto leading-relaxed text-gray-100 px-4">
               Explore the power of Graph Convolutional Networks (GCNs) and analyze their robustness against adversarial attacks with our comprehensive research platform.
             </p>
             <button
               id="try-it-out-btn"
               onClick={onTryItOut}
-              className="group bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-10 py-5 rounded-2xl font-bold text-xl shadow-2xl transition-all duration-300 flex items-center space-x-3 mx-auto transform hover:scale-105 hover:shadow-3xl"
+              className="group bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-6 lg:px-10 py-3 lg:py-5 rounded-xl lg:rounded-2xl font-bold text-lg lg:text-xl shadow-2xl transition-all duration-300 flex items-center space-x-3 mx-auto transform hover:scale-105 hover:shadow-3xl"
             >
               <span className="text-white">Start Exploring</span>
-              <ArrowRight className="w-6 h-6 text-white group-hover:translate-x-1 transition-transform" />
+              <ArrowRight className="w-5 h-5 lg:w-6 lg:h-6 text-white group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
         </div>
@@ -306,7 +307,7 @@ const Homepage = ({ onTryItOut, onSignIn, user, onLogout }) => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
             <div className="text-center">
               <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg icon-neo-primary">
                 <Network className="w-8 h-8 text-white" />
@@ -353,7 +354,7 @@ const Homepage = ({ onTryItOut, onSignIn, user, onLogout }) => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
           <div className="bg-white bg-opacity-10 rounded-2xl shadow-xl p-6">
             <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 shadow-lg icon-neo-primary">
               <BarChart3 className="w-6 h-6 text-white" />

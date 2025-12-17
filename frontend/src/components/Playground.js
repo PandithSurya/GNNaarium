@@ -66,7 +66,7 @@ function Playground({ config, onConfigChange, onStartExperiment, isRunning, onNa
           Choose a preset configuration to get started quickly, or customize your own experiment.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {Object.entries(presets).map(([key, preset]) => (
             <div
               key={key}
@@ -106,7 +106,7 @@ function Playground({ config, onConfigChange, onStartExperiment, isRunning, onNa
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="space-y-3">
             <h3 className="font-medium text-neo-primary">Model Settings</h3>
             <div className="metric-neo p-4 rounded-lg space-y-2 text-sm">
@@ -176,10 +176,10 @@ function Playground({ config, onConfigChange, onStartExperiment, isRunning, onNa
               }
             }}
             disabled={isRunning || !token || !user}
-            className="btn-neo-primary flex items-center space-x-3 text-lg px-8 py-4 rounded-xl disabled:opacity-50"
+            className="btn-neo-primary flex items-center justify-center space-x-3 text-base lg:text-lg px-6 lg:px-8 py-3 lg:py-4 rounded-xl disabled:opacity-50 w-full sm:w-auto"
           >
             <Play className="w-5 h-5" />
-            <span>{isRunning ? 'Starting...' : (!token || !user ? 'Sign In Required' : 'Start Experiment')}</span>
+            <span className="truncate">{isRunning ? 'Starting...' : (!token || !user ? 'Sign In Required' : 'Start Experiment')}</span>
           </button>
         </div>
       </div>

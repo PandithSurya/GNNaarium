@@ -57,6 +57,7 @@ ALL_ATTACKS = ["FGSM", "PGD", "Nettack", "Metattack", "CLGA", "Model Inversion"]
 ALL_DEFENSES = ["jaccard", "feature_denoising", "adversarial_training", "Gradient Regularization", "GNNGuard", "differential_privacy"]
 ALL_EXPLAINERS = ["GNNExplainer", "PGExplainer", "SubgraphX", "ProtGNN", "GraphMask", "NeuronAnalysis"]
 runs = {}
+custom_datasets = {}  # Store uploaded datasets
 
 @router.get("/datasets")
 async def list_datasets():
@@ -79,23 +80,34 @@ async def list_models():
     return {"models": ["GCN", "GIN", "GAT", "GraphSage", "GraphTransformer", "KA-GNN"]}
 
 @router.post("/datasets/upload")
-async def upload_dataset(nodes: UploadFile = File(...), edges: UploadFile = File(...)):
+async def upload_dataset(nodes: UploadFile = File(...), edges: UploadFile = File(None)):
     nodes_bytes = await nodes.read()
-    edges_bytes = await edges.read()
     nodes_df = pd.read_csv(io.BytesIO(nodes_bytes))
-    edges_df = pd.read_csv(io.BytesIO(edges_bytes))
+    
     import tempfile
     import os
     temp_dir = tempfile.gettempdir()
     nodes_path = os.path.join(temp_dir, nodes.filename or "nodes.csv")
-    edges_path = os.path.join(temp_dir, edges.filename or "edges.csv")
     nodes_df.to_csv(nodes_path, index=False)
-    edges_df.to_csv(edges_path, index=False)
+    
+    edges_path = None
+    if edges:
+        edges_bytes = await edges.read()
+        edges_df = pd.read_csv(io.BytesIO(edges_bytes))
+        edges_path = os.path.join(temp_dir, edges.filename or "edges.csv")
+        edges_df.to_csv(edges_path, index=False)
+    
     try:
-        data = load_csv_dataset(nodes_path, edges_path)
+        data = load_csv_dataset(nodes_path, edges_path, edges_optional=True)
     except (FileNotFoundError, ValueError, pd.errors.ParserError) as e:
         raise HTTPException(status_code=400, detail=f"Dataset loading failed: {str(e)}")
+    
+    # Store the dataset for later use
+    dataset_id = f"custom_{int(time.time() * 1000)}"
+    custom_datasets[dataset_id] = data
+    
     stats = dataset_stats(data)
+    stats['dataset_id'] = dataset_id
     return stats
 
 @router.post("/runs")
@@ -104,8 +116,10 @@ async def start_run(config: RunConfig, background_tasks: BackgroundTasks, curren
     
     if dataset_name in BUILTIN_DATASET_NAMES:
         data = load_builtin_dataset(dataset_name)
+    elif dataset_name.startswith('custom_') and dataset_name in custom_datasets:
+        data = custom_datasets[dataset_name]
     else:
-        raise HTTPException(status_code=400, detail="Invalid dataset")
+        raise HTTPException(status_code=400, detail="Invalid dataset. Please upload a custom dataset first or select a builtin dataset.")
     
     run_id = int(time.time() * 1000) % 1000000
     run_manager = RunManager(config.dict(), data)

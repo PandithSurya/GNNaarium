@@ -213,7 +213,15 @@ function ExperimentHistory() {
                       {exp.config?.model?.name || 'GCN'} on {exp.config?.dataset?.name || 'Unknown'}
                     </h4>
                     <p className="text-sm text-neo-secondary">
-                      {new Date(exp.timestamp).toLocaleString()}
+                      {new Date(exp.timestamp).toLocaleString(undefined, {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        timeZoneName: 'short'
+                      })}
                     </p>
                   </div>
                   

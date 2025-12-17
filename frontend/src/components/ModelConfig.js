@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Settings, Info, Network, Layers, Eye, Shuffle, Zap, Brain, CheckCircle, XCircle, Star, Zap as Lightning, Filter } from 'lucide-react';
+import { Settings, Info, Network, Layers, Eye, Shuffle, Zap, Brain, CheckCircle, XCircle, Star, Zap as Lightning, Filter, BookOpen, Code } from 'lucide-react';
+import TheoryModal from './TheoryModal';
+import CodeModal from './CodeModal';
+import { HelpTooltip } from './Tooltip';
 
 const models = [
   { 
@@ -66,6 +69,9 @@ const models = [
 
 function ModelConfig({ config, onChange, datasetConfig }) {
   const [showOnlyCompatible, setShowOnlyCompatible] = useState(false);
+  const [theoryModalOpen, setTheoryModalOpen] = useState(false);
+  const [codeModalOpen, setCodeModalOpen] = useState(false);
+  const [selectedModelForModal, setSelectedModelForModal] = useState(null);
   
   const updateField = (field, value) => {
     onChange({ ...config, [field]: value });
@@ -171,9 +177,13 @@ function ModelConfig({ config, onChange, datasetConfig }) {
   };
 
   const datasetName = datasetConfig?.name;
+  const isCustomDataset = datasetName && datasetName.startsWith('custom_');
   const compatibility = useMemo(() => {
+    if (isCustomDataset) {
+      return null; // No compatibility info for custom datasets
+    }
     return datasetName ? getCompatibility(datasetName) : null;
-  }, [datasetName]);
+  }, [datasetName, isCustomDataset]);
 
   const filteredModels = useMemo(() => {
     if (showOnlyCompatible && compatibility?.compatible) {
@@ -192,6 +202,53 @@ function ModelConfig({ config, onChange, datasetConfig }) {
         </div>
         <h2 className="text-xl font-semibold text-neo-primary">Model Configuration</h2>
       </div>
+
+      {/* Custom Dataset Info */}
+      {isCustomDataset && (
+        <div className="mb-8 p-6 card-neo rounded-xl">
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="p-2 rounded-lg" style={{backgroundColor: 'rgba(59, 130, 246, 0.2)'}}>
+              <Info className="w-5 h-5" style={{color: '#3B82F6'}} />
+            </div>
+            <h4 className="font-bold text-neo-primary text-lg">Custom Dataset Detected</h4>
+          </div>
+          <div className="space-y-3">
+            <p className="text-neo-secondary">
+              You're using a custom dataset. All models are available, but compatibility depends on your specific data characteristics.
+            </p>
+            {datasetConfig?.stats && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-lg bg-neo-elevated">
+                <div className="text-center">
+                  <p className="text-sm text-neo-secondary">Task Type</p>
+                  <p className="font-semibold text-neo-primary">
+                    {datasetConfig.stats.task_type === 'node_classification' ? 'Node Classification' : 
+                     datasetConfig.stats.task_type === 'graph_classification' ? 'Graph Classification' : 
+                     datasetConfig.stats.task_type}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm text-neo-secondary">Nodes</p>
+                  <p className="font-semibold text-neo-primary">{datasetConfig.stats.num_nodes}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm text-neo-secondary">Features</p>
+                  <p className="font-semibold text-neo-primary">{datasetConfig.stats.num_features}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm text-neo-secondary">Classes</p>
+                  <p className="font-semibold text-neo-primary">{datasetConfig.stats.num_classes}</p>
+                </div>
+              </div>
+            )}
+            <div className="p-4 rounded-lg" style={{backgroundColor: 'rgba(245, 158, 11, 0.1)', border: '1px solid #F59E0B'}}>
+              <p className="text-sm" style={{color: '#F59E0B'}}>
+                <strong>Recommendation:</strong> Start with GCN for node classification tasks or GIN for graph classification tasks. 
+                Monitor training metrics to determine the best model for your specific dataset.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Dataset Compatibility Section */}
       {compatibility && (
@@ -317,15 +374,41 @@ function ModelConfig({ config, onChange, datasetConfig }) {
                   border: isSelected ? '2px solid var(--primary)' : 'none'
                 }}
               >
-                <div className="flex items-center space-x-3 mb-3">
-                  <div className={`p-2 rounded-lg ${
-                    isSelected ? 'icon-neo-primary' : 'bg-neo-elevated'
-                  }`}>
-                    <Icon className="w-5 h-5 text-white" />
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-3">
+                    <div className={`p-2 rounded-lg ${
+                      isSelected ? 'icon-neo-primary' : 'bg-neo-elevated'
+                    }`}>
+                      <Icon className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-neo-primary">{model.name}</h4>
+                      <p className="text-xs text-neo-secondary">{model.fullName}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-semibold text-neo-primary">{model.name}</h4>
-                    <p className="text-xs text-neo-secondary">{model.fullName}</p>
+                  <div className="flex space-x-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedModelForModal(model.value);
+                        setTheoryModalOpen(true);
+                      }}
+                      className="p-1 rounded hover:bg-neo-elevated transition-colors"
+                      title="View Theory"
+                    >
+                      <BookOpen className="w-4 h-4 text-neo-secondary hover:text-neo-primary" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedModelForModal(model.value);
+                        setCodeModalOpen(true);
+                      }}
+                      className="p-1 rounded hover:bg-neo-elevated transition-colors"
+                      title="View Code"
+                    >
+                      <Code className="w-4 h-4 text-neo-secondary hover:text-neo-primary" />
+                    </button>
                   </div>
                 </div>
                 <p className="text-sm text-neo-secondary mb-2">{model.description}</p>
@@ -342,8 +425,9 @@ function ModelConfig({ config, onChange, datasetConfig }) {
       <h3 className="text-lg font-semibold text-neo-primary mb-4">Training Parameters</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div>
-          <label className="block text-sm font-medium text-neo-primary mb-2">
-            Hidden Dimension
+          <label className="block text-sm font-medium text-neo-primary mb-2 flex items-center space-x-2">
+            <span>Hidden Dimension</span>
+            <HelpTooltip content="Number of features in hidden layers. Higher values can capture more complex patterns but may overfit." />
           </label>
           <input
             type="number"
@@ -357,8 +441,9 @@ function ModelConfig({ config, onChange, datasetConfig }) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-neo-primary mb-2">
-            Dropout Rate
+          <label className="block text-sm font-medium text-neo-primary mb-2 flex items-center space-x-2">
+            <span>Dropout Rate</span>
+            <HelpTooltip content="Probability of randomly setting neurons to zero during training. Helps prevent overfitting." />
           </label>
           <input
             type="number"
@@ -373,8 +458,9 @@ function ModelConfig({ config, onChange, datasetConfig }) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-neo-primary mb-2">
-            Learning Rate
+          <label className="block text-sm font-medium text-neo-primary mb-2 flex items-center space-x-2">
+            <span>Learning Rate</span>
+            <HelpTooltip content="Step size for gradient descent. Higher values train faster but may overshoot optimal solutions." />
           </label>
           <input
             type="number"
@@ -443,6 +529,17 @@ function ModelConfig({ config, onChange, datasetConfig }) {
           </div>
         </div>
       </div>
+
+      <TheoryModal 
+        modelName={selectedModelForModal} 
+        isOpen={theoryModalOpen} 
+        onClose={() => setTheoryModalOpen(false)} 
+      />
+      <CodeModal 
+        modelName={selectedModelForModal} 
+        isOpen={codeModalOpen} 
+        onClose={() => setCodeModalOpen(false)} 
+      />
     </div>
   );
 }

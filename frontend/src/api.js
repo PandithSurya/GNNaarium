@@ -17,7 +17,9 @@ export const api = {
   uploadDataset: (nodesFile, edgesFile) => {
     const formData = new FormData();
     formData.append('nodes', nodesFile);
-    formData.append('edges', edgesFile);
+    if (edgesFile) {
+      formData.append('edges', edgesFile);
+    }
     return axios.post(`${API_BASE}/datasets/upload`, formData);
   },
 

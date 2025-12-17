@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, Database, Info, BookOpen, Users, Atom, Dna, Globe } from 'lucide-react';
 import { api } from '../api';
+import { HelpTooltip } from './Tooltip';
 
 function DatasetSelector({ config, onChange }) {
   const [uploadMode, setUploadMode] = useState(false);
@@ -108,13 +109,14 @@ function DatasetSelector({ config, onChange }) {
   ];
 
   const handleUpload = async () => {
-    if (!uploadFiles.nodes || !uploadFiles.edges) return;
+    if (!uploadFiles.nodes) return;
     
     setLoading(true);
     try {
       const response = await api.uploadDataset(uploadFiles.nodes, uploadFiles.edges);
       setUploadStats(response.data);
-      onChange({ name: 'Custom', stats: response.data });
+      // Use the dataset_id returned from the server
+      onChange({ name: response.data.dataset_id, stats: response.data });
     } catch (error) {
       console.error('Upload failed:', error);
     } finally {
@@ -141,6 +143,16 @@ function DatasetSelector({ config, onChange }) {
           </button>
         </div>
 
+        {config?.name && config.name.startsWith('custom_') && (
+          <div className="mb-4 p-3 rounded-lg" style={{backgroundColor: 'rgba(59, 130, 246, 0.1)', border: '1px solid #3B82F6'}}>
+            <div className="flex items-center space-x-2">
+              <Upload className="w-4 h-4" style={{color: '#3B82F6'}} />
+              <span className="font-medium" style={{color: '#3B82F6'}}>Custom Dataset Selected</span>
+            </div>
+            <p className="text-sm text-neo-secondary mt-1">Using uploaded dataset: {config.name}</p>
+          </div>
+        )}
+
         {!uploadMode ? (
           <div className="space-y-6">
             <h3 className="font-medium text-neo-primary">Available Datasets</h3>
@@ -151,7 +163,10 @@ function DatasetSelector({ config, onChange }) {
                 return (
                   <div
                     key={dataset.name}
-                    onClick={() => onChange({ name: dataset.name })}
+                    onClick={() => {
+                      onChange({ name: dataset.name });
+                      setUploadStats(null); // Clear upload stats when selecting builtin
+                    }}
                     className={`card-neo p-4 rounded-lg cursor-pointer transition-all duration-200 ${
                       isSelected
                         ? 'border-2 border-primary transform scale-105'
@@ -190,12 +205,40 @@ function DatasetSelector({ config, onChange }) {
             </div>
           </div>
         ) : (
-          <div className="space-y-4">
-            <h3 className="font-medium text-neo-primary">Upload Custom Dataset</h3>
+          <div className="space-y-6">
+            <div>
+              <h3 className="font-medium text-neo-primary mb-3">Upload Custom Dataset</h3>
+              <div className="p-4 rounded-lg" style={{backgroundColor: 'rgba(59, 130, 246, 0.1)', border: '1px solid #3B82F6'}}>
+                <h4 className="font-medium text-neo-primary mb-2">Dataset Requirements</h4>
+                <div className="space-y-3 text-sm text-neo-secondary">
+                  <div>
+                    <p className="font-medium text-neo-primary">Nodes CSV (Required):</p>
+                    <ul className="list-disc list-inside ml-2 space-y-1">
+                      <li><code className="bg-neo-elevated px-1 rounded">id</code> - Unique node identifier (integer)</li>
+                      <li><code className="bg-neo-elevated px-1 rounded">label</code> - Node class/target (integer)</li>
+                      <li><code className="bg-neo-elevated px-1 rounded">feature1, feature2, ...</code> - Node features (numeric)</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="font-medium text-neo-primary">Edges CSV (Optional):</p>
+                    <ul className="list-disc list-inside ml-2 space-y-1">
+                      <li><code className="bg-neo-elevated px-1 rounded">source</code> - Source node ID (integer)</li>
+                      <li><code className="bg-neo-elevated px-1 rounded">target</code> - Target node ID (integer)</li>
+                      <li>If not provided, nodes will be treated as isolated (no edges)</li>
+                    </ul>
+                  </div>
+                  <div className="text-xs">
+                    <p><strong>Note:</strong> Node IDs in edges file must match IDs in nodes file. Edges are automatically made bidirectional.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-neo-primary mb-2">
-                  Nodes CSV File
+                <label className="block text-sm font-medium text-neo-primary mb-2 flex items-center space-x-2">
+                  <span>Nodes CSV File <span className="text-red-500">*</span></span>
+                  <HelpTooltip content="CSV file containing node information. Must have 'id', 'label', and feature columns." />
                 </label>
                 <input
                   type="file"
@@ -204,12 +247,13 @@ function DatasetSelector({ config, onChange }) {
                   className="input-neo w-full px-3 py-2 rounded-lg"
                 />
                 <p className="text-xs text-neo-secondary mt-1">
-                  Required columns: id, label, feature1, feature2, ...
+                  Required: id, label, feature columns
                 </p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-neo-primary mb-2">
-                  Edges CSV File
+                <label className="block text-sm font-medium text-neo-primary mb-2 flex items-center space-x-2">
+                  <span>Edges CSV File <span className="text-neo-secondary">(Optional)</span></span>
+                  <HelpTooltip content="CSV file defining graph connections. Must have 'source' and 'target' columns. If omitted, nodes will be isolated." />
                 </label>
                 <input
                   type="file"
@@ -218,13 +262,13 @@ function DatasetSelector({ config, onChange }) {
                   className="input-neo w-full px-3 py-2 rounded-lg"
                 />
                 <p className="text-xs text-neo-secondary mt-1">
-                  Required columns: source, target
+                  Optional: source, target columns
                 </p>
               </div>
             </div>
             <button
               onClick={handleUpload}
-              disabled={!uploadFiles.nodes || !uploadFiles.edges || loading}
+              disabled={!uploadFiles.nodes || loading}
               className="btn-neo-primary px-6 py-2 rounded-lg disabled:opacity-50"
             >
               {loading ? 'Uploading...' : 'Upload Dataset'}
@@ -238,7 +282,11 @@ function DatasetSelector({ config, onChange }) {
               <Info className="w-4 h-4" style={{color: '#10B981'}} />
               <span className="font-medium" style={{color: '#10B981'}}>Dataset Uploaded Successfully</span>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-neo-secondary">
+            <div className="mb-2 text-sm text-neo-secondary">
+              <span>Dataset ID: </span>
+              <span className="font-mono text-neo-primary">{uploadStats.dataset_id}</span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm text-neo-secondary">
               <div>
                 <span>Nodes:</span>
                 <span className="ml-2 font-medium text-neo-primary">{uploadStats.num_nodes}</span>
@@ -254,6 +302,14 @@ function DatasetSelector({ config, onChange }) {
               <div>
                 <span>Classes:</span>
                 <span className="ml-2 font-medium text-neo-primary">{uploadStats.num_classes}</span>
+              </div>
+              <div>
+                <span>Task:</span>
+                <span className="ml-2 font-medium text-neo-primary">
+                  {uploadStats.task_type === 'node_classification' ? 'Node Classification' : 
+                   uploadStats.task_type === 'graph_classification' ? 'Graph Classification' : 
+                   uploadStats.task_type}
+                </span>
               </div>
             </div>
           </div>

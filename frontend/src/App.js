@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, Database, Shield, Brain, Settings, Home, Zap, History, User, LogOut } from 'lucide-react';
+import { Play, Database, Shield, Brain, Settings, Home, Zap, History, User, LogOut, Menu, X } from 'lucide-react';
 import Homepage from './components/Homepage';
 import DatasetSelector from './components/DatasetSelector';
 import ModelConfig from './components/ModelConfig';
@@ -13,6 +13,7 @@ import { api } from './api';
 function App() {
   const [currentView, setCurrentView] = useState('homepage');
   const [activeTab, setActiveTab] = useState('playground');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [config, setConfig] = useState({
     dataset: { name: 'Cora' },
@@ -145,17 +146,19 @@ function App() {
       {/* Header */}
       <header className="header-neo">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-8">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg icon-neo-gradient">
-                <Brain className="w-7 h-7 text-white" />
+          <div className="flex justify-between items-center py-4 lg:py-8">
+            <div className="flex items-center space-x-3 lg:space-x-4">
+              <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl flex items-center justify-center shadow-lg icon-neo-gradient">
+                <Brain className="w-6 h-6 lg:w-7 lg:h-7 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-neo-primary">GNNaarium</h1>
-                <p className="text-sm font-medium text-neo-secondary">Advanced Graph Neural Network Analysis Platform</p>
+                <h1 className="text-xl lg:text-3xl font-bold text-neo-primary">GNNaarium</h1>
+                <p className="text-xs lg:text-sm font-medium text-neo-secondary hidden sm:block">Advanced Graph Neural Network Analysis Platform</p>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
+            
+            {/* Desktop Navigation */}
+            <div className="hidden lg:flex items-center space-x-4">
               <button
                 onClick={() => setCurrentView('homepage')}
                 className="btn-neo-secondary flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200"
@@ -188,35 +191,110 @@ function App() {
                     <User className="w-4 h-4" />
                     <span className="font-medium">Sign in with Google</span>
                   </button>
-                  <div className="card-neo px-4 py-2 rounded-lg">
+                  <div className="card-neo px-4 py-2 rounded-lg hidden xl:block">
                     <p className="text-sm font-medium text-neo-primary-color">Ready to Experiment</p>
                     <p className="text-xs text-neo-accent">Configure → Train → Analyze</p>
                   </div>
                 </div>
               )}
             </div>
+            
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden btn-neo-secondary p-2 rounded-lg"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
+          
+          {/* Mobile Menu */}
+          {mobileMenuOpen && (
+            <div className="lg:hidden border-t border-neo-border mt-4 pt-4 pb-4">
+              <div className="space-y-3">
+                <button
+                  onClick={() => {
+                    setCurrentView('homepage');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full btn-neo-secondary flex items-center space-x-2 px-4 py-3 rounded-lg transition-all duration-200"
+                >
+                  <Home className="w-4 h-4" />
+                  <span className="font-medium">Home</span>
+                </button>
+                
+                {user ? (
+                  <>
+                    <div className="card-neo px-4 py-3 rounded-lg">
+                      <p className="text-sm font-medium text-neo-primary-color">{user.name}</p>
+                      <p className="text-xs text-neo-accent">{user.email}</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        handleLogout();
+                        setMobileMenuOpen(false);
+                      }}
+                      className="w-full btn-neo-secondary flex items-center space-x-2 px-4 py-3 rounded-lg transition-all duration-200"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span className="font-medium">Logout</span>
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => {
+                      handleGoogleSignIn();
+                      setMobileMenuOpen(false);
+                    }}
+                    data-signin-button
+                    className="w-full btn-neo-primary flex items-center space-x-2 px-4 py-3 rounded-lg transition-all duration-200"
+                  >
+                    <User className="w-4 h-4" />
+                    <span className="font-medium">Sign in with Google</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-8">
         {/* Navigation Tabs */}
-        <div className="nav-neo flex space-x-2 p-2 rounded-2xl shadow-xl mb-10">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`tab-neo flex items-center space-x-3 px-6 py-4 rounded-xl font-semibold transition-all duration-200 ${
-                  activeTab === tab.id ? 'active' : ''
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
+        <div className="nav-neo p-2 rounded-2xl shadow-xl mb-6 lg:mb-10">
+          {/* Mobile Tab Selector */}
+          <div className="lg:hidden">
+            <select
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value)}
+              className="w-full input-neo px-4 py-3 rounded-xl font-semibold"
+            >
+              {tabs.map((tab) => (
+                <option key={tab.id} value={tab.id}>
+                  {tab.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          {/* Desktop Tabs */}
+          <div className="hidden lg:flex space-x-2">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`tab-neo flex items-center space-x-3 px-4 xl:px-6 py-4 rounded-xl font-semibold transition-all duration-200 ${
+                    activeTab === tab.id ? 'active' : ''
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span className="hidden xl:inline">{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Tab Content */}

@@ -208,15 +208,32 @@ def _create_synthetic_arxiv_data():
     
     return Data(x=x, edge_index=edge_index, y=y)
 
-def load_csv_dataset(nodes_path, edges_path):
+def detect_task_type(data):
+    """Detect the task type based on dataset characteristics"""
+    # For now, we assume node classification since we have node labels
+    # This could be extended to detect link prediction, graph classification, etc.
+    if hasattr(data, 'y') and data.y is not None:
+        if len(data.y.shape) == 1 and data.y.shape[0] == data.num_nodes:
+            return "node_classification"
+        elif len(data.y.shape) == 0 or (len(data.y.shape) == 1 and data.y.shape[0] == 1):
+            return "graph_classification"
+    return "node_classification"  # Default assumption
+
+def load_csv_dataset(nodes_path, edges_path, edges_optional=False):
     nodes_df = pd.read_csv(nodes_path)
-    edges_df = pd.read_csv(edges_path)
+    # Handle optional edges file
+    if edges_path and os.path.exists(edges_path):
+        edges_df = pd.read_csv(edges_path)
+        if "source" not in edges_df.columns or "target" not in edges_df.columns:
+            raise ValueError("Edges CSV must contain 'source' and 'target' columns")
+    elif not edges_optional:
+        raise ValueError("Edges CSV file is required")
+    else:
+        edges_df = None
     
     # Validate required columns
     if "id" not in nodes_df.columns or "label" not in nodes_df.columns:
         raise ValueError("Nodes CSV must contain 'id' and 'label' columns")
-    if "source" not in edges_df.columns or "target" not in edges_df.columns:
-        raise ValueError("Edges CSV must contain 'source' and 'target' columns")
     
     # Features: all columns except id and label
     feature_cols = [c for c in nodes_df.columns if c not in ("id", "label")]
@@ -225,9 +242,15 @@ def load_csv_dataset(nodes_path, edges_path):
 
     x = torch.tensor(nodes_df[feature_cols].values, dtype=torch.float)
     y = torch.tensor(nodes_df["label"].values, dtype=torch.long)
-    edge_index = torch.tensor(edges_df[["source", "target"]].values.T, dtype=torch.long)
-    # Add reverse edges for undirectedness if not present
-    edge_index = torch.cat([edge_index, edge_index.flip(0)], dim=1)
+    
+    # Handle edges
+    if edges_df is not None:
+        edge_index = torch.tensor(edges_df[["source", "target"]].values.T, dtype=torch.long)
+        # Add reverse edges for undirectedness if not present
+        edge_index = torch.cat([edge_index, edge_index.flip(0)], dim=1)
+    else:
+        # Create empty edge index for node-only datasets
+        edge_index = torch.zeros(2, 0, dtype=torch.long)
     
     # Create stratified train/val/test masks
     train_mask, val_mask, test_mask = create_stratified_masks(y, len(nodes_df))
@@ -236,9 +259,11 @@ def load_csv_dataset(nodes_path, edges_path):
     return data
 
 def dataset_stats(data):
+    task_type = detect_task_type(data)
     return {
         "num_nodes": int(data.num_nodes),
         "num_edges": int(data.num_edges) if hasattr(data, "num_edges") else int(data.edge_index.shape[1] // 2),
         "num_features": int(data.num_node_features),
         "num_classes": int(len(torch.unique(data.y).tolist())),
+        "task_type": task_type,
     }

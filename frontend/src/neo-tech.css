@@ -216,3 +216,52 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--border-hover);
 }
+
+/* Mobile Responsive Utilities */
+.border-neo-border {
+  border-color: var(--border);
+}
+
+/* Mobile-first responsive design */
+@media (max-width: 768px) {
+  .card-neo {
+    padding: 1rem;
+  }
+  
+  .btn-neo-primary,
+  .btn-neo-secondary {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+  }
+  
+  .tab-neo {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+  }
+  
+  .metric-neo {
+    padding: 0.75rem;
+  }
+  
+  .input-neo {
+    padding: 0.75rem;
+    font-size: 0.875rem;
+  }
+  
+  .header-neo {
+    padding: 0.5rem 0;
+  }
+  
+  .nav-neo {
+    padding: 0.5rem;
+  }
+}
+
+/* Ensure text doesn't overflow on small screens */
+.truncate-mobile {
+  @media (max-width: 640px) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

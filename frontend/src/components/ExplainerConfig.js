@@ -37,11 +37,11 @@ function ExplainerConfig({ config, onChange }) {
       name: 'ProtGNN',
       category: 'Intrinsic',
       icon: Layers,
-      description: 'Self-interpretable prototype-based method that provides inherent interpretability.',
-      explanation: 'Covers intrinsically interpretable side by learning representative prototypes during training.',
-      strengths: ['Inherently interpretable', 'No post-processing', 'Human-friendly'],
-      limitations: ['Model architecture dependent', 'May reduce accuracy'],
-      useCases: ['Healthcare', 'Legal applications', 'High-stakes decisions']
+      description: 'Self-interpretable GNN that explains predictions via similarity to learned prototypes.',
+      explanation: 'Predictions are explained through embedding-space similarity to typical class prototypes, not causal edges.',
+      strengths: ['Intrinsic interpretability', 'Prototype-based reasoning', 'Class-representative examples'],
+      limitations: ['Dataset dependent', 'Embedding-space explanations only'],
+      useCases: ['Example-based reasoning', 'Class similarity analysis', 'Prototype discovery']
     },
     {
       name: 'GraphMask',
@@ -191,7 +191,7 @@ function ExplainerConfig({ config, onChange }) {
                 {/* Target Node Index */}
                 <div>
                   <label className="block text-sm font-medium text-neo-primary mb-2">
-                    Target Node Index(es)
+                    {config.name === 'GraphMask' ? 'Visualization Context Node' : 'Target Node Index(es)'}
                   </label>
                   <input
                     type="text"
@@ -200,7 +200,11 @@ function ExplainerConfig({ config, onChange }) {
                     className="input-neo w-full px-3 py-2 rounded-lg"
                     placeholder="0,1,2 or single node like 5"
                   />
-                  <p className="text-xs text-neo-secondary mt-1">Node(s) to explain (comma-separated, 0-based)</p>
+                  <p className="text-xs text-neo-secondary mt-1">
+                    {config.name === 'GraphMask' 
+                      ? 'Node for visualization context only (GraphMask is global)' 
+                      : 'Node(s) to explain (comma-separated, 0-based)'}
+                  </p>
                 </div>
 
                 {/* Epochs (for optimization-based explainers) */}
@@ -326,14 +330,14 @@ function ExplainerConfig({ config, onChange }) {
                 )}
                 {config.name === 'ProtGNN' && (
                   <p className="text-sm text-neo-primary-color">
-                    Finds prototype nodes that are most similar to the target node. 
-                    Provides inherently interpretable explanations through representative examples.
+                    <strong>Self-interpretable GNN:</strong> Explains predictions via embedding-space similarity to learned prototypes. 
+                    Does NOT identify causal edges - explanations are based on prototype similarity, not edge importance.
                   </p>
                 )}
                 {config.name === 'GraphMask' && (
                   <p className="text-sm text-neo-primary-color">
-                    Learns edge masks while considering graph structure for coherent explanations. 
-                    Balances explanation fidelity with structural reasoning.
+                    <strong>Global explainer:</strong> Learns binary gates on message passing to identify redundant vs essential edges. 
+                    Node selection is only for visualization context - GraphMask explains model behavior, not individual predictions.
                   </p>
                 )}
                 {config.name === 'NeuronAnalysis' && (
