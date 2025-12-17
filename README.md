@@ -1,5 +1,8 @@
 # GNNaarium
 
+## Try it out
+https://gn-naarium-frontend.vercel.app/
+
 A comprehensive platform for Graph Neural Network robustness analysis with adversarial attacks, defense mechanisms, and explainability tools. Features a modern React frontend with real-time monitoring and a FastAPI backend powered by PyTorch Geometric.
 
 ## Setup
