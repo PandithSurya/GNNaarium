@@ -1,294 +1,147 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, BarChart3, Activity, Brain, AlertCircle, Settings } from 'lucide-react';
+import { Play, Activity, TerminalSquare, AlertTriangle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { api } from '../api';
 import GraphVisualization from './GraphVisualization';
 import MetricsPanel from './MetricsPanel';
 import ExplanationVisualization from './ExplanationVisualization';
 
-function RunMonitor({ run, config, onRunComplete, onStartRun, isRunning, configChanged, trainedConfig, user, token, onSignInClick }) {
-  const [status, setStatus] = useState('idle');
-  const [metrics, setMetrics] = useState([]);
-  const [logs, setLogs] = useState([]);
-  const [explanations, setExplanations] = useState([]);
-  const [currentMetric, setCurrentMetric] = useState(null);
-  const wsRef = useRef(null);
+const STATUS = {
+  idle:      { label: 'Idle',      bg: '#F5F5F5', color: '#525252', dot: '#BDBDBD',  pulse: false },
+  running:   { label: 'Running',   bg: '#FFF0F0', color: '#E60000', dot: '#E60000',  pulse: true  },
+  completed: { label: 'Completed', bg: '#F0FDF4', color: '#16A34A', dot: '#16A34A',  pulse: false },
+  error:     { label: 'Error',     bg: '#FFF0F0', color: '#E60000', dot: '#E60000',  pulse: false },
+  stopped:   { label: 'Stopped',   bg: '#FFFBEB', color: '#D97706', dot: '#D97706',  pulse: false },
+};
 
-  useEffect(() => {
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
-    };
-  }, []);
+const LINES = [
+  { key: 'val_acc',    name: 'Val Accuracy',       color: '#16A34A' },
+  { key: 'train_loss', name: 'Train Loss',          color: '#E60000' },
+  { key: 'asr',        name: 'Attack Success Rate', color: '#EA580C', cond: true },
+  { key: 'robust_acc', name: 'Robust Accuracy',     color: '#0891B2', cond: true },
+];
 
-  const connectWebSocket = (runId) => {
-    try {
-      wsRef.current = api.connectWebSocket(runId);
-      
-      wsRef.current.onopen = () => {
-        console.log('WebSocket connected');
-        setStatus('running');
-      };
-      
-      wsRef.current.onmessage = (event) => {
-        console.log('WebSocket message:', event.data);
-        try {
-          const data = JSON.parse(event.data);
-          handleWebSocketMessage(data);
-        } catch (error) {
-          console.error('Failed to parse WebSocket message:', error);
-        }
-      };
-
-      wsRef.current.onclose = () => {
-        console.log('WebSocket closed');
-        setStatus('completed');
-        
-        // Update experiment history with final results
-        const finalResults = currentMetric || (metrics.length > 0 ? metrics[metrics.length - 1] : null);
-        console.log('Updating experiment with final results:', finalResults);
-        console.log('Current metrics array:', metrics);
-        console.log('Current run_id:', run?.run_id);
-        
-        if (finalResults && run?.run_id) {
-          const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-          const history = JSON.parse(localStorage.getItem('experimentHistory') || '[]');
-          const expIndex = history.findIndex(exp => {
-            const expId = String(exp.id);
-            return (expId.startsWith(`${run.run_id}-`) || exp.id === run.run_id) && exp.user_email === currentUser.email;
-          });
-          console.log('Found experiment at index:', expIndex, 'for run_id:', run.run_id);
-          console.log('Current history length:', history.length);
-          
-          if (expIndex !== -1) {
-            // Map current metric fields to expected final result fields
-            const updatedResults = {
-              final_train_loss: finalResults?.train_loss || null,
-              final_val_acc: finalResults?.val_acc || null,
-              final_asr: finalResults?.asr || null,
-              final_robust_acc: finalResults?.robust_acc || null,
-              // Keep original fields for backward compatibility
-              train_loss: finalResults?.train_loss || null,
-              val_acc: finalResults?.val_acc || null,
-              asr: finalResults?.asr || null,
-              robust_acc: finalResults?.robust_acc || null,
-              // Additional accuracy fields for compatibility
-              accuracy: finalResults?.val_acc || null,
-              validation_accuracy: finalResults?.val_acc || null
-            };
-            
-            console.log('Final results object:', finalResults);
-            console.log('Val_acc from final results:', finalResults?.val_acc);
-            
-            console.log('Updating experiment at index', expIndex, 'with results:', updatedResults);
-            history[expIndex].results = updatedResults;
-            localStorage.setItem('experimentHistory', JSON.stringify(history));
-            console.log('Successfully updated experiment history');
-          } else {
-            console.log('Experiment not found in history, available IDs:', history.map(h => h.id));
-            console.log('Looking for run_id prefix:', `${run.run_id}-`);
-          }
-        } else {
-          console.log('Missing finalResults or run_id:', { finalResults, runId: run?.run_id });
-        }
-        
-        setTimeout(() => {
-          setMetrics([]);
-          setLogs([]);
-          setExplanations([]);
-          setCurrentMetric(null);
-          setStatus('idle');
-          wsRef.current = null;
-          onRunComplete?.(finalResults);
-        }, 2000);
-      };
-
-      wsRef.current.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        setStatus('error');
-      };
-    } catch (error) {
-      console.error('Failed to connect WebSocket:', error);
-      setStatus('error');
-      onRunComplete?.(null);
-    }
-  };
-
-  const handleWebSocketMessage = (data) => {
-    console.log('WebSocket message received:', data);
-    switch (data.type) {
-      case 'log':
-        setLogs(prev => [...prev, { timestamp: new Date(), message: data.msg }]);
-        break;
-      case 'metric':
-        const metric = {
-          epoch: data.epoch,
-          train_loss: data.train_loss,
-          val_acc: data.val_acc,
-          asr: data.asr,
-          robust_acc: data.robust_acc
-        };
-        setMetrics(prev => [...prev, metric]);
-        setCurrentMetric(metric);
-        
-        // Save results immediately when we get metrics
-        if (run?.run_id) {
-          const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-          const history = JSON.parse(localStorage.getItem('experimentHistory') || '[]');
-          const expIndex = history.findIndex(exp => {
-            const expId = String(exp.id);
-            return (expId.startsWith(`${run.run_id}-`) || exp.id === run.run_id) && exp.user_email === currentUser.email;
-          });
-          
-          if (expIndex !== -1) {
-            history[expIndex].results = {
-              val_acc: metric.val_acc,
-              train_loss: metric.train_loss
-            };
-            localStorage.setItem('experimentHistory', JSON.stringify(history));
-          }
-        }
-        break;
-      case 'explanation':
-        console.log('Explanation received:', data);
-        if (data.explanation) {
-          console.log('Adding explanation:', data.explanation);
-          setExplanations(prev => {
-            const newExplanations = [...prev, data.explanation];
-            console.log('New explanations array:', newExplanations);
-            return newExplanations;
-          });
-        } else if (data.explanations) {
-          setExplanations(data.explanations);
-        }
-        setLogs(prev => [...prev, { 
-          timestamp: new Date(), 
-          message: `Explainer ${data.explainer} completed for node ${data.explanation?.node_idx ?? 'N/A'}` 
-        }]);
-        break;
-      case 'status':
-        console.log('Status update:', data.status);
-        setStatus(data.status);
-        break;
-      default:
-        console.log('Unknown message type:', data.type);
-        break;
-    }
-  };
-
-  const getStatusBadge = () => {
-    const statusConfig = {
-      idle: { label: 'Idle', className: 'status-badge bg-gray-100 text-gray-700' },
-      running: { label: 'Running', className: 'status-badge status-running' },
-      completed: { label: 'Completed', className: 'status-badge status-completed' },
-      error: { label: 'Error', className: 'status-badge status-error' },
-      stopped: { label: 'Stopped', className: 'status-badge bg-yellow-100 text-yellow-700' }
-    };
-    
-    const config = statusConfig[status] || statusConfig.idle;
-    return <span className={config.className}>{config.label}</span>;
-  };
-
-  useEffect(() => {
-    if (run?.run_id && !wsRef.current) {
-      console.log('Connecting to run:', run.run_id);
-      
-      // Save experiment to history when run starts
-      const experiment = {
-        id: `${run.run_id}-${Date.now()}`,
-        timestamp: new Date().toISOString(),
-        config: JSON.parse(JSON.stringify(config)),
-        results: null,
-        user_email: JSON.parse(localStorage.getItem('user') || '{}').email
-      };
-      const history = JSON.parse(localStorage.getItem('experimentHistory') || '[]');
-      // Remove any existing experiment with same run_id to prevent duplicates
-      const filteredHistory = history.filter(exp => {
-        const expId = String(exp.id);
-        return !expId.startsWith(`${run.run_id}-`) && exp.id !== run.run_id;
-      });
-      filteredHistory.unshift(experiment);
-      localStorage.setItem('experimentHistory', JSON.stringify(filteredHistory.slice(0, 50)));
-      
-      setTimeout(() => {
-        connectWebSocket(run.run_id);
-      }, 1000);
-    }
-  }, [run?.run_id]);
-
-  const experimentConfigCard = (
-    <div className="card-neo rounded-2xl shadow-xl p-8">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center icon-neo-primary">
-            <Settings className="w-5 h-5 text-white" />
+const CustomTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-white rounded-lg shadow-md px-3 py-2.5 text-xs" style={{ border: '1px solid #EBEBEB' }}>
+      <p className="font-semibold mb-1.5" style={{ color: '#525252' }}>Epoch {label}</p>
+      {payload.map(p => (
+        <div key={p.dataKey} className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }} />
+            <span style={{ color: '#737373' }}>{p.name}</span>
           </div>
-          <h3 className="text-xl font-bold text-neo-primary">Experiment Configuration</h3>
+          <span className="font-semibold" style={{ color: p.color }}>{typeof p.value === 'number' ? p.value.toFixed(4) : p.value}</span>
         </div>
-        {configChanged && trainedConfig && (
-          <div className="alert-neo-warning px-4 py-3 rounded-xl text-sm flex items-center space-x-2 shadow-sm">
-            <span>⚠️</span>
-            <span className="font-medium">Configuration changed — retrain to apply</span>
-          </div>
-        )}
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-        {[
-          { label: 'Model', value: `${config.model?.name || 'None'} (${config.model?.epochs || 50} epochs)`, icon: '🧠' },
-          { label: 'Dataset', value: config.dataset?.name || 'None', icon: '📊' },
-          { label: 'Attack', value: config.attack?.name || 'None', icon: '⚔️' },
-          { label: 'Defense', value: config.defense?.name || 'None', icon: '🛡️' },
-          { label: 'Explainer', value: config.explainer?.name || 'None', icon: '🔍' }
-        ].map((item, idx) => (
-          <div key={idx} className="metric-neo p-4 rounded-xl">
-            <div className="flex items-center space-x-2 mb-2">
-              <span className="text-lg">{item.icon}</span>
-              <span className="font-semibold text-neo-secondary text-sm">{item.label}</span>
-            </div>
-            <p className="metric-neo-value text-sm leading-relaxed">{item.value}</p>
-          </div>
-        ))}
-      </div>
+      ))}
     </div>
   );
+};
+
+export default function RunMonitor({ run, config, onRunComplete, onStartRun, isRunning, configChanged, trainedConfig, user, token, onSignInClick }) {
+  const [status,        setStatus]        = useState('idle');
+  const [metrics,       setMetrics]       = useState([]);
+  const [logs,          setLogs]          = useState([]);
+  const [explanations,  setExplanations]  = useState([]);
+  const [currentMetric, setCurrentMetric] = useState(null);
+  const wsRef   = useRef(null);
+  const logsRef = useRef(null);
+
+  useEffect(() => () => { wsRef.current?.close(); wsRef.current = null; }, []);
+  useEffect(() => { if (logsRef.current) logsRef.current.scrollTop = logsRef.current.scrollHeight; }, [logs]);
+
+  const connectWS = (runId) => {
+    try {
+      wsRef.current = api.connectWebSocket(runId);
+      wsRef.current.onopen    = () => setStatus('running');
+      wsRef.current.onmessage = (e) => { try { handleMsg(JSON.parse(e.data)); } catch {} };
+      wsRef.current.onclose   = () => {
+        setStatus('completed');
+        const final = currentMetric || metrics[metrics.length - 1] || null;
+        if (final && run?.run_id) saveHistory(final);
+        setTimeout(() => {
+          setMetrics([]); setLogs([]); setExplanations([]); setCurrentMetric(null);
+          setStatus('idle'); wsRef.current = null; onRunComplete?.(final);
+        }, 2500);
+      };
+      wsRef.current.onerror = () => setStatus('error');
+    } catch { setStatus('error'); onRunComplete?.(null); }
+  };
+
+  const handleMsg = (data) => {
+    if (data.type === 'log') {
+      setLogs(prev => [...prev, { ts: new Date(), msg: data.msg }]);
+    } else if (data.type === 'metric') {
+      const m = { epoch: data.epoch, train_loss: data.train_loss, val_acc: data.val_acc, asr: data.asr, robust_acc: data.robust_acc };
+      setMetrics(prev => [...prev, m]);
+      setCurrentMetric(m);
+      if (run?.run_id) {
+        const u = JSON.parse(localStorage.getItem('user') || '{}');
+        const h = JSON.parse(localStorage.getItem('experimentHistory') || '[]');
+        const i = h.findIndex(e => String(e.id).startsWith(`${run.run_id}-`) && e.user_email === u.email);
+        if (i !== -1) { h[i].results = { val_acc: m.val_acc, train_loss: m.train_loss }; localStorage.setItem('experimentHistory', JSON.stringify(h)); }
+      }
+    } else if (data.type === 'explanation') {
+      if (data.explanation) setExplanations(prev => [...prev, data.explanation]);
+      else if (data.explanations) setExplanations(data.explanations);
+      setLogs(prev => [...prev, { ts: new Date(), msg: `Explainer ${data.explainer} completed for node ${data.explanation?.node_idx ?? 'N/A'}` }]);
+    } else if (data.type === 'status') {
+      setStatus(data.status);
+    }
+  };
+
+  const saveHistory = (final) => {
+    const u = JSON.parse(localStorage.getItem('user') || '{}');
+    const h = JSON.parse(localStorage.getItem('experimentHistory') || '[]');
+    const i = h.findIndex(e => String(e.id).startsWith(`${run.run_id}-`) && e.user_email === u.email);
+    if (i !== -1) {
+      h[i].results = { final_val_acc: final.val_acc, final_train_loss: final.train_loss, val_acc: final.val_acc, train_loss: final.train_loss, asr: final.asr, robust_acc: final.robust_acc, accuracy: final.val_acc };
+      localStorage.setItem('experimentHistory', JSON.stringify(h));
+    }
+  };
+
+  useEffect(() => {
+    if (!run?.run_id || wsRef.current) return;
+    const u = JSON.parse(localStorage.getItem('user') || '{}');
+    const exp = { id: `${run.run_id}-${Date.now()}`, timestamp: new Date().toISOString(), config: JSON.parse(JSON.stringify(config)), results: null, user_email: u.email };
+    const h = JSON.parse(localStorage.getItem('experimentHistory') || '[]');
+    const filtered = h.filter(e => !String(e.id).startsWith(`${run.run_id}-`) && e.id !== run.run_id);
+    filtered.unshift(exp);
+    localStorage.setItem('experimentHistory', JSON.stringify(filtered.slice(0, 50)));
+    setTimeout(() => connectWS(run.run_id), 1000);
+  }, [run?.run_id]);
+
+  const sc = STATUS[status] || STATUS.idle;
+  const visibleLines = LINES.filter(l => !l.cond || (l.key === 'asr' ? metrics.some(m => m.asr != null) : metrics.some(m => m.robust_acc != null)));
 
   if (!run) {
     return (
-      <div className="space-y-6">
-        {experimentConfigCard}
-        <div className="card-neo text-center py-12 rounded-2xl shadow-xl">
-          <Play className="w-12 h-12 text-neo-secondary mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-neo-primary mb-2">
-            {trainedConfig ? 'Retrain Model' : 'Train Model'}
-          </h3>
-          <p className="text-neo-secondary mb-6">
-            {configChanged && trainedConfig 
-              ? 'Apply your configuration changes by retraining the model.'
-              : 'Review your configuration and start training.'}
-          </p>
-          {!token || !user ? (
-            <div 
-              className="alert-neo-warning px-6 py-4 rounded-xl text-center mb-4 cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={onSignInClick}
-            >
-              <p className="font-medium text-neo-primary mb-2">🔒 Authentication Required</p>
-              <p className="text-sm text-neo-secondary">Click here to sign in with Google and start training</p>
+      <div className="space-y-5">
+        <div className="card p-6">
+          <h2 className="section-title mb-1">Training monitor</h2>
+          <p className="section-desc mb-6">Review your configuration and start training.</p>
+
+          {configChanged && trainedConfig && (
+            <div className="flex items-center gap-2 rounded-lg px-4 py-2.5 mb-5 text-sm" style={{ background: '#FFFBEB', border: '1px solid #FDE68A', color: '#92400E' }}>
+              <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: '#D97706' }} />
+              Configuration changed — retrain to apply the new settings.
             </div>
-          ) : null}
-          <button
-            onClick={() => {
-              console.log('Train Model button clicked, isRunning:', isRunning);
-              if (!isRunning) {
-                onStartRun();
-              }
-            }}
-            disabled={isRunning || !token || !user}
-            className="btn-neo-primary flex items-center space-x-2 disabled:opacity-50 mx-auto px-6 py-3 rounded-lg font-medium transition-colors"
-          >
+          )}
+
+          {(!token || !user) && (
+            <div className="flex items-start gap-3 rounded-lg px-4 py-3 mb-5" style={{ background: '#FFF0F0', border: '1px solid #FFB3B3' }}>
+              <div className="w-2 h-2 rounded-full flex-shrink-0 mt-1" style={{ background: '#E60000' }} />
+              <div>
+                <p className="text-sm font-medium" style={{ color: '#B30000' }}>Authentication required</p>
+                <button onClick={onSignInClick} className="text-xs underline mt-0.5" style={{ color: '#E60000' }}>Sign in with Google</button>
+              </div>
+            </div>
+          )}
+
+          <button onClick={onStartRun} disabled={isRunning || !token || !user} className="btn-lg btn-primary gap-2" style={{ opacity: (isRunning || !token || !user) ? 0.4 : 1 }}>
             <Play className="w-4 h-4" />
-            <span>{isRunning ? 'Starting...' : (!token || !user ? 'Sign In Required' : 'Train Model')}</span>
+            {isRunning ? 'Starting…' : (!token || !user ? 'Sign in required' : 'Start training')}
           </button>
         </div>
       </div>
@@ -296,153 +149,58 @@ function RunMonitor({ run, config, onRunComplete, onStartRun, isRunning, configC
   }
 
   return (
-    <div className="space-y-6">
-      {experimentConfigCard}
+    <div className="space-y-5">
 
-      {/* Status Overview */}
-      <div className="card-neo rounded-2xl shadow-xl p-8">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center icon-neo-primary">
-              <Activity className="w-5 h-5 text-white" />
-            </div>
-            <h2 className="text-xl font-semibold text-neo-primary">Training Monitor</h2>
+      {/* Status + metrics */}
+      <div className="card p-6">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <Activity className="w-4 h-4" style={{ color: '#BDBDBD' }} />
+            <h2 className="section-title">Training monitor</h2>
           </div>
-          {getStatusBadge()}
+          <div className="flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full" style={{ background: sc.bg, color: sc.color }}>
+            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: sc.dot, animation: sc.pulse ? 'pulse 2s infinite' : 'none' }} />
+            {sc.label}
+          </div>
         </div>
 
         <MetricsPanel currentMetric={currentMetric} metrics={metrics} />
-        
+
         <div className="grid grid-cols-3 gap-4 mt-4">
-          <div className="metric-neo p-4 rounded-lg">
-            <p className="text-sm text-neo-secondary">Run ID</p>
-            <p className="text-lg font-semibold text-neo-primary">{run.run_id}</p>
-          </div>
-          <div className="metric-neo p-4 rounded-lg">
-            <p className="text-sm text-neo-secondary">Epochs Completed</p>
-            <p className="text-lg font-semibold text-neo-primary">{metrics.length}</p>
-          </div>
-          <div className="metric-neo p-4 rounded-lg">
-            <p className="text-sm text-neo-secondary">Explanations</p>
-            <p className="text-lg font-semibold text-neo-primary">{explanations.length}</p>
-          </div>
+          {[
+            ['Run ID',       run.run_id,          '#0891B2'],
+            ['Epochs',       metrics.length,       '#9333EA'],
+            ['Explanations', explanations.length,  '#D97706'],
+          ].map(([l, v, c]) => (
+            <div key={l} className="card p-4" style={{ borderLeft: `3px solid ${c}` }}>
+              <p className="text-xs font-medium uppercase tracking-wide" style={{ color: '#737373' }}>{l}</p>
+              <p className="text-lg font-semibold mt-1 tabular-nums truncate" style={{ color: '#0D0D0D' }}>{v}</p>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Modern Metrics Chart */}
+      {/* Chart */}
       {metrics.length > 0 && (
-        <div className="card-neo rounded-2xl shadow-xl overflow-hidden">
-          <div className="px-6 py-4" style={{backgroundColor: 'rgba(0, 184, 217, 0.1)', borderBottom: '1px solid var(--border)'}}>
-            <div className="flex items-center space-x-3">
-              <div className="p-2 icon-neo-gradient rounded-xl">
-                <BarChart3 className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-neo-primary">Training Metrics</h3>
-                <p className="text-sm text-neo-secondary">{metrics.length} epochs completed</p>
-              </div>
-            </div>
-          </div>
-          <div className="p-6">
-            <div className="h-80 card-neo rounded-xl p-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={metrics} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-                  <XAxis 
-                    dataKey="epoch" 
-                    stroke="#6b7280"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis 
-                    stroke="#6b7280"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <Tooltip 
-                    contentStyle={{
-                      backgroundColor: 'var(--bg-surface)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '12px',
-                      boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
-                      color: 'var(--text-primary)'
-                    }}
-                  />
-                  <Legend 
-                    wrapperStyle={{
-                      paddingTop: '20px',
-                      fontSize: '14px'
-                    }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="val_acc" 
-                    stroke="url(#blueGradient)" 
-                    name="Validation Accuracy"
-                    strokeWidth={3}
-                    dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
-                    activeDot={{ r: 6, stroke: '#3b82f6', strokeWidth: 2, fill: '#ffffff' }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="train_loss" 
-                    stroke="url(#redGradient)" 
-                    name="Training Loss"
-                    strokeWidth={3}
-                    dot={{ fill: '#ef4444', strokeWidth: 2, r: 4 }}
-                    activeDot={{ r: 6, stroke: '#ef4444', strokeWidth: 2, fill: '#ffffff' }}
-                  />
-                  {metrics.some(m => m.asr !== null) && (
-                    <Line 
-                      type="monotone" 
-                      dataKey="asr" 
-                      stroke="url(#orangeGradient)" 
-                      name="Attack Success Rate"
-                      strokeWidth={3}
-                      dot={{ fill: '#f59e0b', strokeWidth: 2, r: 4 }}
-                      activeDot={{ r: 6, stroke: '#f59e0b', strokeWidth: 2, fill: '#ffffff' }}
-                    />
-                  )}
-                  {metrics.some(m => m.robust_acc !== null) && (
-                    <Line 
-                      type="monotone" 
-                      dataKey="robust_acc" 
-                      stroke="url(#greenGradient)" 
-                      name="Robust Accuracy"
-                      strokeWidth={3}
-                      dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
-                      activeDot={{ r: 6, stroke: '#10b981', strokeWidth: 2, fill: '#ffffff' }}
-                    />
-                  )}
-                  <defs>
-                    <linearGradient id="blueGradient" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor="#3b82f6" />
-                      <stop offset="100%" stopColor="#6366f1" />
-                    </linearGradient>
-                    <linearGradient id="redGradient" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor="#ef4444" />
-                      <stop offset="100%" stopColor="#f97316" />
-                    </linearGradient>
-                    <linearGradient id="orangeGradient" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor="#f59e0b" />
-                      <stop offset="100%" stopColor="#eab308" />
-                    </linearGradient>
-                    <linearGradient id="greenGradient" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor="#10b981" />
-                      <stop offset="100%" stopColor="#059669" />
-                    </linearGradient>
-                  </defs>
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+        <div className="card p-6">
+          <h3 className="section-title mb-5">Training metrics</h3>
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={metrics} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#F5F5F5" vertical={false} />
+              <XAxis dataKey="epoch" tick={{ fontSize: 11, fill: '#BDBDBD' }} tickLine={false} axisLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: '#BDBDBD' }} tickLine={false} axisLine={false} />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 12, paddingTop: 16 }} />
+              {visibleLines.map(l => (
+                <Line key={l.key} type="monotone" dataKey={l.key} name={l.name} stroke={l.color} strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: l.color }} />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
         </div>
       )}
 
-      {/* Graph Visualization */}
       {run && (
-        <GraphVisualization 
+        <GraphVisualization
           dataset={config?.dataset?.name}
           nodeExplanations={explanations}
           selectedNodes={config?.explainer?.node_ids}
@@ -453,37 +211,27 @@ function RunMonitor({ run, config, onRunComplete, onStartRun, isRunning, configC
         />
       )}
 
-      {/* Enhanced Explanations Visualization */}
-      <ExplanationVisualization 
-        explanations={explanations}
-        selectedNodes={config?.explainer?.node_ids}
-      />
+      <ExplanationVisualization explanations={explanations} selectedNodes={config?.explainer?.node_ids} />
 
       {/* Logs */}
-      <div className="card-neo rounded-2xl shadow-xl p-8">
-        <div className="flex items-center space-x-3 mb-6">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center icon-neo-primary">
-            <AlertCircle className="w-5 h-5 text-white" />
-          </div>
-          <h3 className="text-lg font-semibold text-neo-primary">Training Logs</h3>
+      <div className="card p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <TerminalSquare className="w-4 h-4" style={{ color: '#BDBDBD' }} />
+          <h3 className="section-title">Training logs</h3>
+          <span className="ml-auto text-xs px-2.5 py-0.5 rounded-full font-medium" style={{ background: '#F5F5F5', color: '#525252' }}>{logs.length} entries</span>
         </div>
-        <div className="p-4 rounded-lg font-mono text-sm max-h-64 overflow-y-auto" style={{backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)'}}>
-          {logs.length === 0 ? (
-            <p className="text-neo-secondary">No logs yet...</p>
-          ) : (
-            logs.map((log, index) => (
-              <div key={index} className="mb-1">
-                <span className="text-neo-secondary">
-                  [{log.timestamp.toLocaleTimeString()}]
-                </span>
-                <span className="ml-2">{log.message}</span>
+        <div ref={logsRef} className="log-block h-48 scrollbar-none">
+          {logs.length === 0
+            ? <span style={{ color: '#525252' }}>Waiting for training output…</span>
+            : logs.map((log, i) => (
+              <div key={i} className="mb-1">
+                <span style={{ color: '#D97706' }}>[{log.ts.toLocaleTimeString()}]</span>
+                <span className="ml-2" style={{ color: '#BDBDBD' }}>{log.msg}</span>
               </div>
             ))
-          )}
+          }
         </div>
       </div>
     </div>
   );
 }
-
-export default RunMonitor;

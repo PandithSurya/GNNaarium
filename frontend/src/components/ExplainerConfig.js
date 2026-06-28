@@ -1,359 +1,122 @@
-import React, { useState } from 'react';
-import { Search, Brain, Target, Layers, Zap, Eye, BarChart3 } from 'lucide-react';
+import React from 'react';
+import { Search, Info } from 'lucide-react';
 
-function ExplainerConfig({ config, onChange }) {
-  const explainers = [
-    {
-      name: 'GNNExplainer',
-      category: 'Post-hoc',
-      icon: Search,
-      description: 'Baseline post-hoc explainer that optimizes edge masks to identify important subgraphs.',
-      explanation: 'Widely used and interpretable method that learns edge importance through gradient-based optimization.',
-      strengths: ['Well-established', 'Interpretable results', 'Works with any GNN'],
-      limitations: ['Computationally expensive', 'Local explanations only'],
-      useCases: ['Node classification', 'Subgraph identification', 'Feature importance']
-    },
-    {
-      name: 'PGExplainer',
-      category: 'Post-hoc',
-      icon: Brain,
-      description: 'Parametric explainer that uses neural networks to generate explanations efficiently.',
-      explanation: 'Scalable approach good for real-world datasets with consistent explanation quality.',
-      strengths: ['Scalable', 'Fast inference', 'Consistent quality'],
-      limitations: ['Requires training', 'Less interpretable'],
-      useCases: ['Large-scale graphs', 'Real-time explanations', 'Production systems']
-    },
-    {
-      name: 'SubgraphX',
-      category: 'Post-hoc',
-      icon: Target,
-      description: 'Shapley value-based explainer with strong theoretical grounding for subgraph importance.',
-      explanation: 'Uses game theory principles to fairly attribute importance to different graph components.',
-      strengths: ['Theoretical guarantees', 'Fair attribution', 'Robust explanations'],
-      limitations: ['Computationally intensive', 'Requires sampling'],
-      useCases: ['Critical applications', 'Research', 'Fairness-sensitive domains']
-    },
-    {
-      name: 'ProtGNN',
-      category: 'Intrinsic',
-      icon: Layers,
-      description: 'Self-interpretable GNN that explains predictions via similarity to learned prototypes.',
-      explanation: 'Predictions are explained through embedding-space similarity to typical class prototypes, not causal edges.',
-      strengths: ['Intrinsic interpretability', 'Prototype-based reasoning', 'Class-representative examples'],
-      limitations: ['Dataset dependent', 'Embedding-space explanations only'],
-      useCases: ['Example-based reasoning', 'Class similarity analysis', 'Prototype discovery']
-    },
-    {
-      name: 'GraphMask',
-      category: 'Post-hoc',
-      icon: Zap,
-      description: 'Edge-masking explainer that integrates structural reasoning for better explanations.',
-      explanation: 'Combines edge importance with graph structure understanding for coherent explanations.',
-      strengths: ['Structure-aware', 'Coherent explanations', 'Good fidelity'],
-      limitations: ['Complex optimization', 'Parameter sensitive'],
-      useCases: ['Social networks', 'Molecular graphs', 'Structured data']
-    },
-    {
-      name: 'NeuronAnalysis',
-      category: 'Global',
-      icon: Eye,
-      description: 'Global concept-based explainer that connects neurons to logical concepts.',
-      explanation: 'Analyzes internal model representations to understand what concepts the model has learned.',
-      strengths: ['Global insights', 'Concept discovery', 'Model debugging'],
-      limitations: ['Complex interpretation', 'Requires domain knowledge'],
-      useCases: ['Model analysis', 'Concept discovery', 'Debugging']
-    }
-  ];
+const CAT_STYLE = {
+  'Post-hoc':  { bg: '#FAF5FF', color: '#9333EA', border: '#E9D5FF' },
+  'Intrinsic': { bg: '#FFFBEB', color: '#D97706', border: '#FDE68A' },
+  'Global':    { bg: '#ECFEFF', color: '#0891B2', border: '#A5F3FC' },
+};
 
-  const updateExplainerField = (field, value) => {
+const EXPLAINERS = [
+  { name: 'GNNExplainer',   category: 'Post-hoc',  desc: 'Optimizes edge masks to identify important subgraphs. Well-established baseline.',         strengths: 'Interpretable, works with any GNN', limitations: 'Slow for large graphs',         params: ['node_idx','explainer_epochs','sparsity_weight','lr'] },
+  { name: 'PGExplainer',    category: 'Post-hoc',  desc: 'Neural parametric explainer that generates explanations efficiently.',                      strengths: 'Fast, scalable',                   limitations: 'Less interpretable',            params: ['node_idx'] },
+  { name: 'SubgraphX',      category: 'Post-hoc',  desc: 'Shapley value-based explainer with game-theory grounding for fair attribution.',             strengths: 'Theoretical fairness guarantees',  limitations: 'Computationally intensive',     params: ['node_idx','num_samples'] },
+  { name: 'ProtGNN',        category: 'Intrinsic', desc: 'Self-interpretable GNN — explains predictions via similarity to learned class prototypes.',  strengths: 'Intrinsic interpretability',       limitations: 'Embedding-space only',          params: ['num_prototypes'] },
+  { name: 'GraphMask',      category: 'Post-hoc',  desc: 'Learns binary gates on message passing to identify essential edges. Global explainer.',      strengths: 'Structure-aware, good fidelity',   limitations: 'Complex optimization',          params: ['node_idx','explainer_epochs','sparsity_weight','lr'] },
+  { name: 'NeuronAnalysis', category: 'Global',    desc: 'Analyzes internal activations to understand concepts the model has learned globally.',       strengths: 'Global model insights',            limitations: 'Requires domain knowledge',     params: ['node_idx'] },
+];
+
+const PARAM_DEFS = {
+  node_idx:         { label: 'Target node index(es)', hint: 'Comma-separated, 0-based', type: 'text',   default: '0' },
+  explainer_epochs: { label: 'Optimization epochs',   hint: '10–500',                   type: 'number', default: 100,  min: 10,    max: 500, step: 10 },
+  sparsity_weight:  { label: 'Sparsity weight',        hint: '0.001–0.1',                type: 'number', default: 0.01, min: 0.001, max: 0.1, step: 0.001 },
+  lr:               { label: 'Learning rate',          hint: '0.001–0.1',                type: 'number', default: 0.01, min: 0.001, max: 0.1, step: 0.001 },
+  num_samples:      { label: 'Shapley samples',        hint: '10–200',                   type: 'number', default: 50,   min: 10,    max: 200, step: 10 },
+  num_prototypes:   { label: 'Number of prototypes',   hint: '1–20',                     type: 'number', default: 5,    min: 1,     max: 20,  step: 1 },
+};
+
+const CATEGORIES = ['Post-hoc', 'Intrinsic', 'Global'];
+
+export default function ExplainerConfig({ config, onChange }) {
+  const selected  = config?.name;
+  const explainer = EXPLAINERS.find(e => e.name === selected);
+
+  const updateField = (field, value) =>
     onChange(config ? { ...config, [field]: value } : { name: '', [field]: value });
-  };
 
   return (
-    <div className="space-y-8">
-      <div className="card-neo rounded-2xl shadow-xl p-8">
-        <div className="flex items-center space-x-4 mb-8">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg icon-neo-gradient">
-            <BarChart3 className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-neo-primary">Explainer Configuration</h2>
-            <p className="text-sm text-neo-secondary">Understand model decisions through interpretability methods</p>
-          </div>
+    <div className="space-y-6">
+      <div className="card p-6">
+        <div className="flex items-center gap-2 mb-1">
+          <Search className="w-4 h-4" style={{ color: '#9333EA' }} />
+          <h2 className="section-title">Explainer</h2>
         </div>
+        <p className="section-desc mb-5">Interpretability methods to understand model decisions. Runs after training completes.</p>
 
-        <div className="space-y-6">
-          <h3 className="text-xl font-bold text-neo-primary mb-2">Select Explainer Method</h3>
-          <p className="text-neo-secondary mb-6">Choose how to interpret your model's predictions</p>
-          
-          {/* No Explainer Option */}
-          <div className="mb-6">
-            <div
-              onClick={() => onChange(null)}
-              className={`p-5 rounded-xl border-2 cursor-pointer transition-all duration-200 hover:shadow-lg card-neo ${
-                !config?.name ? 'transform scale-105' : ''
-              }`}
-              style={{
-                borderColor: !config?.name ? 'var(--border-hover)' : 'var(--border)',
-                backgroundColor: !config?.name ? 'var(--bg-elevated)' : 'var(--bg-surface)'
-              }}
-            >
-              <div className="flex items-center space-x-3 mb-3">
-                <div className={`p-2 rounded-lg ${
-                  !config?.name ? 'icon-neo-primary' : 'bg-neo-elevated'
-                }`}>
-                  <Target className="w-5 h-5 text-white" />
-                </div>
-                <h4 className="font-semibold text-neo-primary">No Explainer</h4>
-              </div>
-              <p className="text-sm text-neo-secondary mb-2">Train and evaluate model without explanation generation.</p>
-              <p className="text-xs text-neo-secondary">Baseline mode focusing purely on model performance without interpretability analysis.</p>
-            </div>
-          </div>
+        {/* None */}
+        <button onClick={() => onChange(null)} className={`select-card text-left w-full mb-5 ${!selected ? 'selected' : ''}`}>
+          <p className="text-sm font-semibold mb-1" style={{ color: '#0D0D0D' }}>No explainer</p>
+          <p className="text-xs" style={{ color: '#737373' }}>Train and evaluate without generating explanations.</p>
+        </button>
 
-          {/* Explainer Categories */}
-          {['Post-hoc', 'Intrinsic', 'Global'].map(category => (
-            <div key={category} className="space-y-4">
-              <h4 className="font-medium text-neo-primary flex items-center space-x-2">
-                <span>{category === 'Post-hoc' ? '🔍' : category === 'Intrinsic' ? '🧠' : '🌐'}</span>
-                <span>{category} Explainers</span>
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {explainers.filter(explainer => explainer.category === category).map(explainer => {
-                  const Icon = explainer.icon;
-                  const isSelected = config?.name === explainer.name;
-                  return (
-                    <div
-                      key={explainer.name}
-                      onClick={() => onChange(isSelected ? null : { name: explainer.name })}
-                      className={`p-5 rounded-xl border-2 cursor-pointer transition-all duration-200 hover:shadow-lg card-neo ${
-                        isSelected ? 'transform scale-105' : ''
-                      }`}
-                      style={{
-                        borderColor: isSelected ? 'var(--primary)' : 'var(--border)',
-                        backgroundColor: isSelected ? 'var(--bg-elevated)' : 'var(--bg-surface)'
-                      }}
-                    >
-                      <div className="flex items-center space-x-3 mb-3">
-                        <div className={`p-2 rounded-lg ${
-                          isSelected ? 'icon-neo-primary' : 'bg-neo-elevated'
-                        }`}>
-                          <Icon className="w-5 h-5 text-white" />
-                        </div>
-                        <div>
-                          <h5 className="font-semibold text-neo-primary">{explainer.name}</h5>
-                          <span className={`text-xs px-2 py-1 rounded-full ${
-                            explainer.category === 'Post-hoc' ? 'text-neo-primary-color' :
-                            explainer.category === 'Intrinsic' ? 'text-neo-accent' :
-                            'text-neo-secondary'
-                          }`} style={{
-                            backgroundColor: explainer.category === 'Post-hoc' ? 'rgba(0, 184, 217, 0.1)' :
-                            explainer.category === 'Intrinsic' ? 'rgba(139, 92, 246, 0.1)' :
-                            'rgba(148, 163, 184, 0.1)'
-                          }}>
-                            {explainer.category}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <p className="text-sm text-neo-secondary mb-3">{explainer.description}</p>
-                      <p className="text-xs text-neo-secondary mb-3">{explainer.explanation}</p>
-                      
-                      <div className="space-y-2">
-                        <div>
-                          <span className="text-xs font-medium" style={{color: '#10B981'}}>Strengths:</span>
-                          <p className="text-xs text-neo-secondary">{explainer.strengths.join(', ')}</p>
-                        </div>
-                        <div>
-                          <span className="text-xs font-medium" style={{color: '#EF4444'}}>Limitations:</span>
-                          <p className="text-xs text-neo-secondary">{explainer.limitations.join(', ')}</p>
-                        </div>
-                        <div>
-                          <span className="text-xs font-medium text-neo-primary-color">Use Cases:</span>
-                          <p className="text-xs text-neo-secondary">{explainer.useCases.join(', ')}</p>
-                        </div>
-                      </div>
+        {CATEGORIES.map(cat => {
+          const cs = CAT_STYLE[cat];
+          return (
+            <div key={cat} className="mb-6">
+              <span className="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full mb-3" style={{ background: cs.bg, color: cs.color, border: `1px solid ${cs.border}` }}>
+                {cat}
+              </span>
+              <div className="grid sm:grid-cols-2 gap-3">
+                {EXPLAINERS.filter(e => e.category === cat).map(exp => (
+                  <button
+                    key={exp.name}
+                    onClick={() => onChange(selected === exp.name ? null : { name: exp.name })}
+                    className={`select-card text-left ${selected === exp.name ? 'selected' : ''}`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-sm font-semibold" style={{ color: '#0D0D0D' }}>{exp.name}</p>
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: cs.bg, color: cs.color }}>{cat}</span>
                     </div>
-                  );
-                })}
+                    <p className="text-xs leading-relaxed mb-2" style={{ color: '#737373' }}>{exp.desc}</p>
+                    <div className="space-y-0.5 text-xs">
+                      <p><span className="font-medium" style={{ color: '#16A34A' }}>+</span> <span style={{ color: '#737373' }}>{exp.strengths}</span></p>
+                      <p><span className="font-medium" style={{ color: '#E60000' }}>–</span> <span style={{ color: '#737373' }}>{exp.limitations}</span></p>
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
-          ))}
-
-          {config?.name && (
-            <div className="mt-8 p-6 card-neo rounded-xl">
-              <h4 className="font-bold text-neo-primary mb-6 flex items-center space-x-2">
-                <span>⚙️</span>
-                <span>Explainer Parameters</span>
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                
-                {/* Target Node Index */}
-                <div>
-                  <label className="block text-sm font-medium text-neo-primary mb-2">
-                    {config.name === 'GraphMask' ? 'Visualization Context Node' : 'Target Node Index(es)'}
-                  </label>
-                  <input
-                    type="text"
-                    value={config.node_idx || '0'}
-                    onChange={(e) => updateExplainerField('node_idx', e.target.value)}
-                    className="input-neo w-full px-3 py-2 rounded-lg"
-                    placeholder="0,1,2 or single node like 5"
-                  />
-                  <p className="text-xs text-neo-secondary mt-1">
-                    {config.name === 'GraphMask' 
-                      ? 'Node for visualization context only (GraphMask is global)' 
-                      : 'Node(s) to explain (comma-separated, 0-based)'}
-                  </p>
-                </div>
-
-                {/* Epochs (for optimization-based explainers) */}
-                {['GNNExplainer', 'GraphMask'].includes(config.name) && (
-                  <div>
-                    <label className="block text-sm font-medium text-neo-primary mb-2">
-                      Optimization Epochs
-                    </label>
-                    <input
-                      type="number"
-                      value={config.explainer_epochs || 100}
-                      onChange={(e) => updateExplainerField('explainer_epochs', parseInt(e.target.value))}
-                      className="input-neo w-full px-3 py-2 rounded-lg"
-                      min="10"
-                      max="500"
-                      step="10"
-                    />
-                    <p className="text-xs text-neo-secondary mt-1">Training epochs for explanation</p>
-                  </div>
-                )}
-
-                {/* Number of Samples (for SubgraphX) */}
-                {config.name === 'SubgraphX' && (
-                  <div>
-                    <label className="block text-sm font-medium text-neo-primary mb-2">
-                      Shapley Samples
-                    </label>
-                    <input
-                      type="number"
-                      value={config.num_samples || 50}
-                      onChange={(e) => updateExplainerField('num_samples', parseInt(e.target.value))}
-                      className="input-neo w-full px-3 py-2 rounded-lg"
-                      min="10"
-                      max="200"
-                      step="10"
-                    />
-                    <p className="text-xs text-neo-secondary mt-1">Number of samples for Shapley values</p>
-                  </div>
-                )}
-
-                {/* Number of Prototypes (for ProtGNN) */}
-                {config.name === 'ProtGNN' && (
-                  <div>
-                    <label className="block text-sm font-medium text-neo-primary mb-2">
-                      Number of Prototypes
-                    </label>
-                    <input
-                      type="number"
-                      value={config.num_prototypes || 5}
-                      onChange={(e) => updateExplainerField('num_prototypes', parseInt(e.target.value))}
-                      className="input-neo w-full px-3 py-2 rounded-lg"
-                      min="1"
-                      max="20"
-                      step="1"
-                    />
-                    <p className="text-xs text-neo-secondary mt-1">Number of prototype nodes to find</p>
-                  </div>
-                )}
-
-                {/* Sparsity Weight */}
-                {['GNNExplainer', 'GraphMask'].includes(config.name) && (
-                  <div>
-                    <label className="block text-sm font-medium text-neo-primary mb-2">
-                      Sparsity Weight
-                    </label>
-                    <input
-                      type="number"
-                      value={config.sparsity_weight || 0.01}
-                      onChange={(e) => updateExplainerField('sparsity_weight', parseFloat(e.target.value))}
-                      className="input-neo w-full px-3 py-2 rounded-lg"
-                      min="0.001"
-                      max="0.1"
-                      step="0.001"
-                    />
-                    <p className="text-xs text-neo-secondary mt-1">Weight for sparsity regularization</p>
-                  </div>
-                )}
-
-                {/* Learning Rate */}
-                {['GNNExplainer', 'GraphMask'].includes(config.name) && (
-                  <div>
-                    <label className="block text-sm font-medium text-neo-primary mb-2">
-                      Learning Rate
-                    </label>
-                    <input
-                      type="number"
-                      value={config.lr || 0.01}
-                      onChange={(e) => updateExplainerField('lr', parseFloat(e.target.value))}
-                      className="input-neo w-full px-3 py-2 rounded-lg"
-                      min="0.001"
-                      max="0.1"
-                      step="0.001"
-                    />
-                    <p className="text-xs text-neo-secondary mt-1">Learning rate for optimization</p>
-                  </div>
-                )}
-
-              </div>
-
-              {/* Explainer-specific information */}
-              <div className="mt-6 p-4 rounded-xl" style={{backgroundColor: 'rgba(0, 184, 217, 0.1)', border: '1px solid var(--primary)'}}>
-                <h5 className="font-bold text-neo-primary-color mb-3 flex items-center space-x-2">
-                  <span>💡</span>
-                  <span>About {config.name}</span>
-                </h5>
-                {config.name === 'GNNExplainer' && (
-                  <p className="text-sm text-neo-primary-color">
-                    Optimizes a learnable edge mask to identify the most important subgraph for the prediction. 
-                    Higher epochs provide better explanations but take longer to compute.
-                  </p>
-                )}
-                {config.name === 'PGExplainer' && (
-                  <p className="text-sm text-neo-primary-color">
-                    Uses a parametric approach with neural networks to generate explanations efficiently. 
-                    Provides consistent explanation quality across different inputs.
-                  </p>
-                )}
-                {config.name === 'SubgraphX' && (
-                  <p className="text-sm text-neo-primary-color">
-                    Computes Shapley values to fairly attribute importance to graph components. 
-                    More samples provide more accurate Shapley values but increase computation time.
-                  </p>
-                )}
-                {config.name === 'ProtGNN' && (
-                  <p className="text-sm text-neo-primary-color">
-                    <strong>Self-interpretable GNN:</strong> Explains predictions via embedding-space similarity to learned prototypes. 
-                    Does NOT identify causal edges - explanations are based on prototype similarity, not edge importance.
-                  </p>
-                )}
-                {config.name === 'GraphMask' && (
-                  <p className="text-sm text-neo-primary-color">
-                    <strong>Global explainer:</strong> Learns binary gates on message passing to identify redundant vs essential edges. 
-                    Node selection is only for visualization context - GraphMask explains model behavior, not individual predictions.
-                  </p>
-                )}
-                {config.name === 'NeuronAnalysis' && (
-                  <p className="text-sm text-neo-primary-color">
-                    Analyzes internal model activations to understand learned concepts. 
-                    Provides global insights into model behavior and decision-making patterns.
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-
-        </div>
+          );
+        })}
       </div>
+
+      {/* Parameters */}
+      {explainer && (
+        <div className="card p-6">
+          <h3 className="section-title mb-1">Parameters — {explainer.name}</h3>
+          <p className="section-desc mb-5">{explainer.desc}</p>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-5">
+            {explainer.params.map(key => {
+              const def = PARAM_DEFS[key];
+              return (
+                <div key={key}>
+                  <label className="label">{def.label}</label>
+                  <input
+                    type={def.type}
+                    value={config[key] ?? def.default}
+                    onChange={e => updateField(key, def.type === 'number' ? parseFloat(e.target.value) : e.target.value)}
+                    {...(def.type === 'number' ? { min: def.min, max: def.max, step: def.step } : {})}
+                    className="input"
+                    placeholder={String(def.default)}
+                  />
+                  <p className="text-xs mt-1" style={{ color: '#BDBDBD' }}>{def.hint}</p>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-5 flex items-start gap-3 rounded-lg p-3" style={{ background: '#FAF5FF', border: '1px solid #E9D5FF' }}>
+            <Info className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#9333EA' }} />
+            <p className="text-xs leading-relaxed" style={{ color: '#6B21A8' }}>
+              {selected === 'GraphMask'      && 'GraphMask is a global explainer — node selection is only for visualization context.'}
+              {selected === 'ProtGNN'        && 'ProtGNN uses embedding-space similarity to prototypes, not edge masks.'}
+              {selected === 'NeuronAnalysis' && 'NeuronAnalysis provides global model insights, not per-prediction explanations.'}
+              {!['GraphMask','ProtGNN','NeuronAnalysis'].includes(selected) && `${selected} produces per-node subgraph explanations after model training.`}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
-export default ExplainerConfig;

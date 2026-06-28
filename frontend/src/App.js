@@ -1,5 +1,9 @@
-import React, { useState } from 'react';
-import { Play, Database, Shield, Brain, Settings, Home, Zap, History, User, LogOut, Menu, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Zap, Database, Shield, Brain, Play, History,
+  ChevronLeft, ChevronRight, LayoutDashboard, LogOut,
+  User, Menu, X, Network, Settings
+} from 'lucide-react';
 import Homepage from './components/Homepage';
 import DatasetSelector from './components/DatasetSelector';
 import ModelConfig from './components/ModelConfig';
@@ -10,554 +14,345 @@ import Playground from './components/Playground';
 import ExperimentHistory from './components/ExperimentHistory';
 import { api } from './api';
 
+const NAV = [
+  { id: 'playground',     label: 'Quick Start',     icon: Zap },
+  { id: 'dataset',        label: 'Dataset',          icon: Database },
+  { id: 'model',          label: 'Model',            icon: Brain },
+  { id: 'attack-defense', label: 'Attack & Defense', icon: Shield },
+  { id: 'explainer',      label: 'Explainer',        icon: Network },
+  { id: 'run',            label: 'Training Monitor', icon: Play },
+];
+
+function ConfigStrip({ config }) {
+  const chips = [
+    config.model?.name    || 'No model',
+    config.dataset?.name  || 'No dataset',
+    config.attack?.name   || 'No attack',
+    config.defense?.name  || 'No defense',
+    config.explainer?.name|| 'No explainer',
+  ];
+  return (
+    <div className="config-strip">
+      {chips.map((c, i) => <span key={i} className="config-chip">{c}</span>)}
+    </div>
+  );
+}
+
+function UserMenu({ user, onLogout, onSignIn }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+
+  if (!user) {
+    return (
+      <button onClick={onSignIn} className="btn-md btn-primary">
+        <User className="w-4 h-4" /> Sign in
+      </button>
+    );
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg transition-colors hover:bg-w-100"
+      >
+        <div className="w-7 h-7 rounded-full bg-r-500 flex items-center justify-center flex-shrink-0">
+          <span className="text-white text-xs font-semibold">{user.name?.[0]?.toUpperCase() || 'U'}</span>
+        </div>
+        <span className="text-sm font-medium text-b-300 max-w-[120px] truncate hidden sm:block">{user.name}</span>
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1.5 w-56 bg-white border border-w-200 rounded-xl shadow-md z-50 py-1 overflow-hidden">
+          <div className="px-4 py-3" style={{ borderBottom: '1px solid #EBEBEB' }}>
+            <p className="text-sm font-semibold text-b-500 truncate">{user.name}</p>
+            <p className="text-xs text-b-50 truncate">{user.email}</p>
+          </div>
+          <button
+            onClick={() => { setOpen(false); onLogout(); }}
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-r-500 hover:bg-r-50 transition-colors"
+          >
+            <LogOut className="w-4 h-4" /> Sign out
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function App() {
-  const [currentView, setCurrentView] = useState('homepage');
-  const [activeTab, setActiveTab] = useState('playground');
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [currentView,      setCurrentView]      = useState('homepage');
+  const [activeTab,        setActiveTab]         = useState('playground');
+  const [sidebarCollapsed, setSidebarCollapsed]  = useState(false);
+  const [mobileSidebarOpen,setMobileSidebarOpen] = useState(false);
 
   const [config, setConfig] = useState({
-    dataset: { name: 'Cora' },
-    model: { name: 'GCN', hidden_dim: 64, dropout: 0.5, lr: 0.01, epochs: 50, seed: 42, weight_decay: 5e-4 },
-    attack: null,
-    defense: null,
-    explainer: null
+    dataset:  { name: 'Cora' },
+    model:    { name: 'GCN', hidden_dim: 64, dropout: 0.5, lr: 0.01, epochs: 50, seed: 42, weight_decay: 5e-4 },
+    attack:   null,
+    defense:  null,
+    explainer:null,
   });
-  const [currentRun, setCurrentRun] = useState(null);
-  const [isRunning, setIsRunning] = useState(false);
-
+  const [currentRun,    setCurrentRun]    = useState(null);
+  const [isRunning,     setIsRunning]     = useState(false);
   const [trainedConfig, setTrainedConfig] = useState(null);
   const [configChanged, setConfigChanged] = useState(false);
-  const [user, setUser] = useState(null);
+  const [user,  setUser]  = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token'));
 
-  const tabs = [
-    { id: 'playground', label: 'Playground', icon: Zap },
-    { id: 'dataset', label: 'Dataset', icon: Database },
-    { id: 'model', label: 'Model', icon: Settings },
-    { id: 'attack-defense', label: 'Attack & Defense', icon: Shield },
-    { id: 'explainer', label: 'Explainer', icon: Brain },
-    { id: 'run', label: 'Run & Monitor', icon: Play },
-    ...(user && token ? [{ id: 'history', label: 'History', icon: History }] : [])
+  const nav = [
+    ...NAV,
+    ...(user && token ? [{ id: 'history', label: 'History', icon: History }] : []),
   ];
 
+  const activeNav = nav.find(n => n.id === activeTab);
+
+  const updateConfig = (section, data) => {
+    setConfig(prev => {
+      const next = { ...prev, [section]: data };
+      if (trainedConfig) setConfigChanged(JSON.stringify(next) !== JSON.stringify(trainedConfig));
+      return next;
+    });
+  };
+
   const startRun = async () => {
-    // Check if user is authenticated
-    if (!token || !user) {
-      alert('Please sign in to start training');
-      return;
-    }
-    
-    if (isRunning) {
-      console.log('Training already in progress, ignoring duplicate request');
-      return; // Prevent duplicate runs
-    }
-    
+    if (!token || !user) { alert('Please sign in to start training'); return; }
+    if (isRunning) return;
     try {
-      console.log('Starting training run...');
       setIsRunning(true);
-      setCurrentRun(null); // Clear any previous run
-      
+      setCurrentRun(null);
       const response = await api.startRun(config);
-      console.log('Training started with run ID:', response.data.run_id);
-      
       setCurrentRun(response.data);
       setTrainedConfig(JSON.parse(JSON.stringify(config)));
       setConfigChanged(false);
       setActiveTab('run');
     } catch (error) {
-      console.error('Failed to start run:', error);
-      if (error.response?.status === 401) {
-        alert('Please sign in to start training');
-        handleLogout();
-      } else {
-        alert('Failed to start run: ' + (error.response?.data?.detail || error.message));
-      }
+      if (error.response?.status === 401) { alert('Please sign in'); handleLogout(); }
+      else alert('Failed to start run: ' + (error.response?.data?.detail || error.message));
       setIsRunning(false);
       setCurrentRun(null);
     }
   };
 
-  const updateConfig = (section, data) => {
-    setConfig(prev => {
-      const newConfig = { ...prev, [section]: data };
-      if (trainedConfig) {
-        const changed = JSON.stringify(newConfig) !== JSON.stringify(trainedConfig);
-        setConfigChanged(changed);
-      } else {
-        setConfigChanged(false);
-      }
-      return newConfig;
-    });
-  };
-
   const handleGoogleSignIn = () => {
-    const redirectTo = currentView === 'homepage' ? '/' : '/playground';
-    window.location.href = `http://localhost:8000/auth/google/login?redirect_to=${redirectTo}`;
+    const redirect = currentView === 'homepage' ? '/' : '/playground';
+    window.location.href = `http://localhost:8000/auth/google/login?redirect_to=${redirect}`;
   };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    setToken(null);
-    setUser(null);
-    // Always redirect to homepage on logout
+    setToken(null); setUser(null);
     setCurrentView('homepage');
   };
 
-  // Check for auth callback
-  React.useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const authToken = urlParams.get('token');
-    const userData = urlParams.get('user');
-    
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authToken = params.get('token');
+    const userData  = params.get('user');
     if (authToken && userData) {
       const userObj = JSON.parse(decodeURIComponent(userData));
       localStorage.setItem('token', authToken);
       localStorage.setItem('user', JSON.stringify(userObj));
-      setToken(authToken);
-      setUser(userObj);
-      
-      // Check if we're on playground path (from redirect)
-      if (window.location.pathname === '/playground') {
-        setCurrentView('platform');
-        setActiveTab('playground');
-      } else {
-        // Default to homepage if no specific redirect
-        setCurrentView('homepage');
-      }
-      
-      // Clean URL
+      setToken(authToken); setUser(userObj);
+      setCurrentView(window.location.pathname === '/playground' ? 'platform' : 'homepage');
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (token) {
-      // Try to get user from stored token
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
-      }
+      const stored = localStorage.getItem('user');
+      if (stored) setUser(JSON.parse(stored));
     }
-  }, [token, currentView]);
+  }, [token]);
 
   if (currentView === 'homepage') {
-    return <Homepage onTryItOut={() => setCurrentView('platform')} onSignIn={handleGoogleSignIn} user={user} onLogout={handleLogout} />;
+    return (
+      <Homepage
+        onTryItOut={() => setCurrentView('platform')}
+        onSignIn={handleGoogleSignIn}
+        user={user}
+        onLogout={handleLogout}
+      />
+    );
   }
 
   return (
-    <div className="min-h-screen bg-neo-primary">
-      {/* Header */}
-      <header className="header-neo">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4 lg:py-8">
-            <div className="flex items-center space-x-3 lg:space-x-4">
-              <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl flex items-center justify-center shadow-lg icon-neo-gradient">
-                <Brain className="w-6 h-6 lg:w-7 lg:h-7 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl lg:text-3xl font-bold text-neo-primary">GNNaarium</h1>
-                <p className="text-xs lg:text-sm font-medium text-neo-secondary hidden sm:block">Advanced Graph Neural Network Analysis Platform</p>
-              </div>
+    <div className="flex h-screen overflow-hidden" style={{ background: '#F5F5F5' }}>
+
+      {/* Mobile overlay */}
+      {mobileSidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setMobileSidebarOpen(false)} />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+        {/* Logo */}
+        <div className="flex items-center h-14 px-4 flex-shrink-0" style={{ borderBottom: '1px solid #EBEBEB' }}>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-7 h-7 rounded-lg bg-r-500 flex items-center justify-center flex-shrink-0">
+              <Network className="w-4 h-4 text-white" />
             </div>
-            
-            {/* Desktop Navigation */}
-            <div className="hidden lg:flex items-center space-x-4">
+            {!sidebarCollapsed && (
+              <span className="font-semibold text-b-500 text-sm truncate">GNNaarium</span>
+            )}
+          </div>
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="ml-auto hidden lg:flex items-center justify-center w-6 h-6 rounded-md btn-ghost flex-shrink-0"
+          >
+            {sidebarCollapsed
+              ? <ChevronRight className="w-3.5 h-3.5" />
+              : <ChevronLeft  className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+
+        {/* Nav */}
+        <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto scrollbar-none">
+          <button
+            onClick={() => setCurrentView('homepage')}
+            className={`nav-item w-full ${sidebarCollapsed ? 'justify-center px-2' : ''}`}
+          >
+            <LayoutDashboard className="nav-icon" />
+            {!sidebarCollapsed && <span>Home</span>}
+          </button>
+
+          <div className={`${!sidebarCollapsed ? 'px-3 pt-4 pb-1' : 'px-2 pt-4 pb-1'}`}>
+            {!sidebarCollapsed
+              ? <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#BDBDBD' }}>Experiment</p>
+              : <div className="divider" />
+            }
+          </div>
+
+          {nav.map(item => {
+            const Icon = item.icon;
+            return (
               <button
-                onClick={() => setCurrentView('homepage')}
-                className="btn-neo-secondary flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200"
+                key={item.id}
+                onClick={() => { setActiveTab(item.id); setMobileSidebarOpen(false); }}
+                className={`nav-item w-full ${activeTab === item.id ? 'active' : ''} ${sidebarCollapsed ? 'justify-center px-2' : ''}`}
               >
-                <Home className="w-4 h-4" />
-                <span className="font-medium">Home</span>
+                <Icon className="nav-icon" />
+                {!sidebarCollapsed && <span>{item.label}</span>}
               </button>
-              
-              {user ? (
-                <div className="flex items-center space-x-3">
-                  <div className="card-neo px-4 py-2 rounded-lg">
-                    <p className="text-sm font-medium text-neo-primary-color">{user.name}</p>
-                    <p className="text-xs text-neo-accent">{user.email}</p>
-                  </div>
-                  <button
-                    onClick={handleLogout}
-                    className="btn-neo-secondary flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    <span className="font-medium">Logout</span>
-                  </button>
+            );
+          })}
+        </nav>
+
+        {/* Sidebar footer */}
+        {!sidebarCollapsed && (
+          <div className="p-3 flex-shrink-0" style={{ borderTop: '1px solid #EBEBEB' }}>
+            {user ? (
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-full bg-r-500 flex items-center justify-center flex-shrink-0">
+                  <span className="text-white text-xs font-semibold">{user.name?.[0]?.toUpperCase()}</span>
                 </div>
-              ) : (
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={handleGoogleSignIn}
-                    data-signin-button
-                    className="btn-neo-primary flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200"
-                  >
-                    <User className="w-4 h-4" />
-                    <span className="font-medium">Sign in with Google</span>
-                  </button>
-                  <div className="card-neo px-4 py-2 rounded-lg hidden xl:block">
-                    <p className="text-sm font-medium text-neo-primary-color">Ready to Experiment</p>
-                    <p className="text-xs text-neo-accent">Configure → Train → Analyze</p>
-                  </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-b-500 truncate">{user.name}</p>
+                  <p className="text-xs truncate" style={{ color: '#737373' }}>{user.email}</p>
                 </div>
-              )}
-            </div>
-            
-            {/* Mobile Menu Button */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden btn-neo-secondary p-2 rounded-lg"
-            >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
-          </div>
-          
-          {/* Mobile Menu */}
-          {mobileMenuOpen && (
-            <div className="lg:hidden border-t border-neo-border mt-4 pt-4 pb-4">
-              <div className="space-y-3">
-                <button
-                  onClick={() => {
-                    setCurrentView('homepage');
-                    setMobileMenuOpen(false);
-                  }}
-                  className="w-full btn-neo-secondary flex items-center space-x-2 px-4 py-3 rounded-lg transition-all duration-200"
-                >
-                  <Home className="w-4 h-4" />
-                  <span className="font-medium">Home</span>
+                <button onClick={handleLogout} className="btn-ghost btn-sm p-1.5 rounded-md">
+                  <LogOut className="w-3.5 h-3.5" />
                 </button>
-                
-                {user ? (
-                  <>
-                    <div className="card-neo px-4 py-3 rounded-lg">
-                      <p className="text-sm font-medium text-neo-primary-color">{user.name}</p>
-                      <p className="text-xs text-neo-accent">{user.email}</p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        handleLogout();
-                        setMobileMenuOpen(false);
-                      }}
-                      className="w-full btn-neo-secondary flex items-center space-x-2 px-4 py-3 rounded-lg transition-all duration-200"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      <span className="font-medium">Logout</span>
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => {
-                      handleGoogleSignIn();
-                      setMobileMenuOpen(false);
-                    }}
-                    data-signin-button
-                    className="w-full btn-neo-primary flex items-center space-x-2 px-4 py-3 rounded-lg transition-all duration-200"
-                  >
-                    <User className="w-4 h-4" />
-                    <span className="font-medium">Sign in with Google</span>
-                  </button>
-                )}
               </div>
+            ) : (
+              <button onClick={handleGoogleSignIn} className="btn-md btn-primary w-full">
+                <User className="w-4 h-4" /> Sign in
+              </button>
+            )}
+          </div>
+        )}
+      </aside>
+
+      {/* Main */}
+      <div className={`main-content ${sidebarCollapsed ? 'sidebar-collapsed' : ''} flex-1 flex flex-col min-w-0 overflow-hidden`}>
+
+        {/* Top bar */}
+        <header className="h-14 bg-white flex items-center px-4 gap-3 flex-shrink-0 z-20" style={{ borderBottom: '1px solid #EBEBEB' }}>
+          <button
+            className="lg:hidden btn-ghost btn-sm p-1.5 rounded-md"
+            onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+          >
+            {mobileSidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+          </button>
+
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-1.5 text-sm min-w-0">
+            <span style={{ color: '#BDBDBD' }}>Experiment</span>
+            <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#D6D6D6' }} />
+            <span className="font-medium text-b-500 truncate">{activeNav?.label || 'Overview'}</span>
+          </div>
+
+          {/* Config changed warning */}
+          {configChanged && trainedConfig && (
+            <div className="hidden md:flex items-center gap-1.5 badge-red px-3 py-1.5 rounded-lg text-xs font-medium ml-2">
+              <div className="status-dot-red" />
+              Config changed — retrain to apply
             </div>
           )}
-        </div>
-      </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-8">
-        {/* Navigation Tabs */}
-        <div className="nav-neo p-2 rounded-2xl shadow-xl mb-6 lg:mb-10">
-          {/* Mobile Tab Selector */}
-          <div className="lg:hidden">
-            <select
-              value={activeTab}
-              onChange={(e) => setActiveTab(e.target.value)}
-              className="w-full input-neo px-4 py-3 rounded-xl font-semibold"
-            >
-              {tabs.map((tab) => (
-                <option key={tab.id} value={tab.id}>
-                  {tab.label}
-                </option>
-              ))}
-            </select>
+          <div className="ml-auto">
+            <UserMenu user={user} onLogout={handleLogout} onSignIn={handleGoogleSignIn} />
           </div>
-          
-          {/* Desktop Tabs */}
-          <div className="hidden lg:flex space-x-2">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`tab-neo flex items-center space-x-3 px-4 xl:px-6 py-4 rounded-xl font-semibold transition-all duration-200 ${
-                    activeTab === tab.id ? 'active' : ''
-                  }`}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span className="hidden xl:inline">{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        </header>
 
-        {/* Tab Content */}
-        <div className="space-y-6">
-          {activeTab === 'playground' && (
-            <Playground
-              config={config}
-              onConfigChange={setConfig}
-              onStartExperiment={startRun}
-              isRunning={isRunning}
-              user={user}
-              token={token}
-              onSignInClick={() => {
-                const signInButton = document.querySelector('[data-signin-button]');
-                if (signInButton) {
-                  signInButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  signInButton.focus();
-                }
-              }}
-              onNavigate={() => {
-                setTimeout(() => {
-                  const configSection = document.getElementById('current-configuration');
-                  if (configSection) {
-                    configSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  }
-                }, 200);
-              }}
-            />
-          )}
+        {/* Content */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="max-w-6xl mx-auto p-6 space-y-6">
 
-          {activeTab === 'dataset' && (
-            <>
-              <DatasetSelector
-                config={config.dataset}
-                onChange={(data) => updateConfig('dataset', data)}
+            {/* Config strip */}
+            <div className="card p-3 hidden md:block">
+              <ConfigStrip config={config} />
+            </div>
+
+            {activeTab === 'playground' && (
+              <Playground
+                config={config}
+                onConfigChange={setConfig}
+                onStartExperiment={startRun}
+                isRunning={isRunning}
+                user={user}
+                token={token}
+                onSignInClick={handleGoogleSignIn}
+                onNavigateToTab={setActiveTab}
               />
-              <div className="card-neo rounded-2xl shadow-xl p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center icon-neo-primary">
-                      <Settings className="w-5 h-5 text-white" />
-                    </div>
-                    <h3 className="text-xl font-bold text-neo-primary">Experiment Configuration</h3>
-                  </div>
-                  {configChanged && trainedConfig && (
-                    <div className="alert-neo-warning px-4 py-3 rounded-xl text-sm flex items-center space-x-2 shadow-sm">
-                      <span>⚠️</span>
-                      <span className="font-medium">Configuration changed — retrain to apply</span>
-                    </div>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                  {[
-                    { label: 'Model', value: `${config.model?.name || 'None'} (${config.model?.epochs || 50} epochs)`, icon: '🧠' },
-                    { label: 'Dataset', value: config.dataset?.name || 'None', icon: '📊' },
-                    { label: 'Attack', value: config.attack?.name || 'None', icon: '⚔️' },
-                    { label: 'Defense', value: config.defense?.name || 'None', icon: '🛡️' },
-                    { label: 'Explainer', value: config.explainer?.name || 'None', icon: '🔍' }
-                  ].map((item, idx) => (
-                    <div key={idx} className="metric-neo p-4 rounded-xl">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <span className="text-lg">{item.icon}</span>
-                        <span className="font-semibold text-neo-secondary text-sm">{item.label}</span>
-                      </div>
-                      <p className="metric-neo-value text-sm leading-relaxed">{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-
-          {activeTab === 'model' && (
-            <>
-              <ModelConfig
-                config={config.model}
-                onChange={(data) => updateConfig('model', data)}
-                datasetConfig={config.dataset}
-              />
-              <div className="card-neo rounded-2xl shadow-xl p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center icon-neo-primary">
-                      <Settings className="w-5 h-5 text-white" />
-                    </div>
-                    <h3 className="text-xl font-bold text-neo-primary">Experiment Configuration</h3>
-                  </div>
-                  {configChanged && trainedConfig && (
-                    <div className="alert-neo-warning px-4 py-3 rounded-xl text-sm flex items-center space-x-2 shadow-sm">
-                      <span>⚠️</span>
-                      <span className="font-medium">Configuration changed — retrain to apply</span>
-                    </div>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                  {[
-                    { label: 'Model', value: `${config.model?.name || 'None'} (${config.model?.epochs || 50} epochs)`, icon: '🧠' },
-                    { label: 'Dataset', value: config.dataset?.name || 'None', icon: '📊' },
-                    { label: 'Attack', value: config.attack?.name || 'None', icon: '⚔️' },
-                    { label: 'Defense', value: config.defense?.name || 'None', icon: '🛡️' },
-                    { label: 'Explainer', value: config.explainer?.name || 'None', icon: '🔍' }
-                  ].map((item, idx) => (
-                    <div key={idx} className="metric-neo p-4 rounded-xl">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <span className="text-lg">{item.icon}</span>
-                        <span className="font-semibold text-neo-secondary text-sm">{item.label}</span>
-                      </div>
-                      <p className="metric-neo-value text-sm leading-relaxed">{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-
-          {activeTab === 'attack-defense' && (
-            <>
+            )}
+            {activeTab === 'dataset' && (
+              <DatasetSelector config={config.dataset} onChange={(d) => updateConfig('dataset', d)} />
+            )}
+            {activeTab === 'model' && (
+              <ModelConfig config={config.model} onChange={(d) => updateConfig('model', d)} datasetConfig={config.dataset} />
+            )}
+            {activeTab === 'attack-defense' && (
               <AttackDefenseConfig
                 attackConfig={config.attack}
                 defenseConfig={config.defense}
-                onAttackChange={(data) => updateConfig('attack', data)}
-                onDefenseChange={(data) => updateConfig('defense', data)}
+                onAttackChange={(d) => updateConfig('attack', d)}
+                onDefenseChange={(d) => updateConfig('defense', d)}
               />
-              <div className="card-neo rounded-2xl shadow-xl p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center icon-neo-primary">
-                      <Settings className="w-5 h-5 text-white" />
-                    </div>
-                    <h3 className="text-xl font-bold text-neo-primary">Experiment Configuration</h3>
-                  </div>
-                  {configChanged && trainedConfig && (
-                    <div className="alert-neo-warning px-4 py-3 rounded-xl text-sm flex items-center space-x-2 shadow-sm">
-                      <span>⚠️</span>
-                      <span className="font-medium">Configuration changed — retrain to apply</span>
-                    </div>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                  {[
-                    { label: 'Model', value: `${config.model?.name || 'None'} (${config.model?.epochs || 50} epochs)`, icon: '🧠' },
-                    { label: 'Dataset', value: config.dataset?.name || 'None', icon: '📊' },
-                    { label: 'Attack', value: config.attack?.name || 'None', icon: '⚔️' },
-                    { label: 'Defense', value: config.defense?.name || 'None', icon: '🛡️' },
-                    { label: 'Explainer', value: config.explainer?.name || 'None', icon: '🔍' }
-                  ].map((item, idx) => (
-                    <div key={idx} className="metric-neo p-4 rounded-xl">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <span className="text-lg">{item.icon}</span>
-                        <span className="font-semibold text-neo-secondary text-sm">{item.label}</span>
-                      </div>
-                      <p className="metric-neo-value text-sm leading-relaxed">{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-
-          {activeTab === 'explainer' && (
-            <>
-              <div className="card-neo rounded-2xl shadow-xl p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center icon-neo-primary">
-                      <Settings className="w-5 h-5 text-white" />
-                    </div>
-                    <h3 className="text-xl font-bold text-neo-primary">Experiment Configuration</h3>
-                  </div>
-                  {configChanged && trainedConfig && (
-                    <div className="alert-neo-warning px-4 py-3 rounded-xl text-sm flex items-center space-x-2 shadow-sm">
-                      <span>⚠️</span>
-                      <span className="font-medium">Configuration changed — retrain to apply</span>
-                    </div>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                  {[
-                    { label: 'Model', value: `${config.model?.name || 'None'} (${config.model?.epochs || 50} epochs)`, icon: '🧠' },
-                    { label: 'Dataset', value: config.dataset?.name || 'None', icon: '📊' },
-                    { label: 'Attack', value: config.attack?.name || 'None', icon: '⚔️' },
-                    { label: 'Defense', value: config.defense?.name || 'None', icon: '🛡️' },
-                    { label: 'Explainer', value: config.explainer?.name || 'None', icon: '🔍' }
-                  ].map((item, idx) => (
-                    <div key={idx} className="metric-neo p-4 rounded-xl">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <span className="text-lg">{item.icon}</span>
-                        <span className="font-semibold text-neo-secondary text-sm">{item.label}</span>
-                      </div>
-                      <p className="metric-neo-value text-sm leading-relaxed">{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <ExplainerConfig
-                config={config.explainer}
-                onChange={(data) => updateConfig('explainer', data)}
+            )}
+            {activeTab === 'explainer' && (
+              <ExplainerConfig config={config.explainer} onChange={(d) => updateConfig('explainer', d)} />
+            )}
+            {activeTab === 'run' && (
+              <RunMonitor
+                run={currentRun}
+                config={config}
+                onRunComplete={() => { setIsRunning(false); setCurrentRun(null); }}
+                onStartRun={startRun}
+                isRunning={isRunning}
+                configChanged={configChanged}
+                trainedConfig={trainedConfig}
+                user={user}
+                token={token}
+                onSignInClick={handleGoogleSignIn}
               />
-              <div className="card-neo rounded-2xl shadow-xl p-8" style={{display: 'none'}}>
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center icon-neo-primary">
-                      <Settings className="w-5 h-5 text-white" />
-                    </div>
-                    <h3 className="text-xl font-bold text-neo-primary">Experiment Configuration</h3>
-                  </div>
-                  {configChanged && trainedConfig && (
-                    <div className="alert-neo-warning px-4 py-3 rounded-xl text-sm flex items-center space-x-2 shadow-sm">
-                      <span>⚠️</span>
-                      <span className="font-medium">Configuration changed — retrain to apply</span>
-                    </div>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                  {[
-                    { label: 'Model', value: `${config.model?.name || 'None'} (${config.model?.epochs || 50} epochs)`, icon: '🧠' },
-                    { label: 'Dataset', value: config.dataset?.name || 'None', icon: '📊' },
-                    { label: 'Attack', value: config.attack?.name || 'None', icon: '⚔️' },
-                    { label: 'Defense', value: config.defense?.name || 'None', icon: '🛡️' },
-                    { label: 'Explainer', value: config.explainer?.name || 'None', icon: '🔍' }
-                  ].map((item, idx) => (
-                    <div key={idx} className="metric-neo p-4 rounded-xl">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <span className="text-lg">{item.icon}</span>
-                        <span className="font-semibold text-neo-secondary text-sm">{item.label}</span>
-                      </div>
-                      <p className="metric-neo-value text-sm leading-relaxed">{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-
-          {activeTab === 'run' && (
-            <RunMonitor
-              run={currentRun}
-              config={config}
-              onRunComplete={() => {
-                console.log('Training completed, resetting state');
-                setIsRunning(false);
-                setCurrentRun(null);
-              }}
-              onStartRun={startRun}
-              isRunning={isRunning}
-              configChanged={configChanged}
-              trainedConfig={trainedConfig}
-              user={user}
-              token={token}
-              onSignInClick={() => {
-                const signInButton = document.querySelector('[data-signin-button]');
-                if (signInButton) {
-                  signInButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  signInButton.focus();
-                }
-              }}
-            />
-          )}
-
-          {activeTab === 'history' && (
-            <ExperimentHistory />
-          )}
-        </div>
+            )}
+            {activeTab === 'history' && <ExperimentHistory />}
+          </div>
+        </main>
       </div>
     </div>
   );

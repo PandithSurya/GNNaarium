@@ -1,316 +1,172 @@
-import React, { useState, useEffect } from 'react';
-import { Upload, Database, Info, BookOpen, Users, Atom, Dna, Globe } from 'lucide-react';
+import React, { useState } from 'react';
+import { Upload, CheckCircle2, Info } from 'lucide-react';
 import { api } from '../api';
-import { HelpTooltip } from './Tooltip';
 
-function DatasetSelector({ config, onChange }) {
-  const [uploadMode, setUploadMode] = useState(false);
-  const [uploadFiles, setUploadFiles] = useState({ nodes: null, edges: null });
+const CATEGORY_STYLE = {
+  Citation:   { bg: '#ECFEFF', color: '#0891B2', border: '#A5F3FC' },
+  Social:     { bg: '#F0FDF4', color: '#16A34A', border: '#BBF7D0' },
+  Molecular:  { bg: '#FFFBEB', color: '#D97706', border: '#FDE68A' },
+  Biological: { bg: '#FFF7ED', color: '#EA580C', border: '#FED7AA' },
+  Academic:   { bg: '#FAF5FF', color: '#9333EA', border: '#E9D5FF' },
+};
+
+const TASK_STYLE = {
+  'Node classification':  { color: '#0891B2' },
+  'Graph classification': { color: '#D97706' },
+  'Graph regression':     { color: '#9333EA' },
+};
+
+const DATASETS = [
+  { name: 'Cora',        category: 'Citation',   nodes: '2,708',   edges: '5,429',   features: 1433, classes: 7,   task: 'Node classification',  desc: 'Scientific publications with citation links. Standard node classification benchmark.' },
+  { name: 'Citeseer',   category: 'Citation',   nodes: '3,327',   edges: '4,732',   features: 3703, classes: 6,   task: 'Node classification',  desc: 'Computer science papers with citation relationships. Denser than Cora.' },
+  { name: 'PubMed',     category: 'Citation',   nodes: '19,717',  edges: '44,338',  features: 500,  classes: 3,   task: 'Node classification',  desc: 'Biomedical publications from PubMed. Larger-scale citation network.' },
+  { name: 'Reddit',     category: 'Social',     nodes: '232,965', edges: '11.6M',   features: 602,  classes: 41,  task: 'Node classification',  desc: 'Large-scale social network from Reddit posts. Inductive learning benchmark.' },
+  { name: 'MUTAG',      category: 'Molecular',  nodes: '17.9 avg',edges: '19.8 avg',features: 7,    classes: 2,   task: 'Graph classification', desc: 'Chemical compounds dataset. Predict mutagenicity.' },
+  { name: 'PROTEINS',   category: 'Biological', nodes: '39.1 avg',edges: '72.8 avg',features: 3,    classes: 2,   task: 'Graph classification', desc: 'Protein structure graphs. Classify proteins as enzymes or non-enzymes.' },
+  { name: 'ZINC',       category: 'Molecular',  nodes: '23.2 avg',edges: '24.9 avg',features: 28,   classes: '—', task: 'Graph regression',     desc: 'Drug-like molecules from ZINC database. Predict molecular properties.' },
+  { name: 'OGBN-Arxiv', category: 'Academic',   nodes: '169,343', edges: '1.17M',   features: 128,  classes: 40,  task: 'Node classification',  desc: 'arXiv paper citation network. Large-scale OGB benchmark.' },
+];
+
+export default function DatasetSelector({ config, onChange }) {
+  const [uploadMode,  setUploadMode]  = useState(false);
+  const [files,       setFiles]       = useState({ nodes: null, edges: null });
   const [uploadStats, setUploadStats] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  const datasets = [
-    {
-      name: 'Cora',
-      icon: BookOpen,
-      category: 'Citation Network',
-      nodes: 2708,
-      edges: 5429,
-      features: 1433,
-      classes: 7,
-      featureType: 'Bag-of-words (paper keywords)',
-      task: 'Node classification (paper topics)',
-      description: 'Scientific publications dataset with citation links. Each node represents a paper, edges are citations.'
-    },
-    {
-      name: 'Citeseer',
-      icon: BookOpen,
-      category: 'Citation Network',
-      nodes: 3327,
-      edges: 4732,
-      features: 3703,
-      classes: 6,
-      featureType: 'Bag-of-words (paper keywords)',
-      task: 'Node classification (paper topics)',
-      description: 'Computer science papers with citation relationships. Smaller but denser than Cora.'
-    },
-    {
-      name: 'PubMed',
-      icon: BookOpen,
-      category: 'Citation Network',
-      nodes: 19717,
-      edges: 44338,
-      features: 500,
-      classes: 3,
-      featureType: 'TF-IDF word vectors',
-      task: 'Node classification (medical topics)',
-      description: 'Biomedical publications from PubMed database. Larger scale citation network.'
-    },
-    {
-      name: 'Reddit',
-      icon: Users,
-      category: 'Social Network',
-      nodes: 232965,
-      edges: 11606919,
-      features: 602,
-      classes: 41,
-      featureType: 'Post embeddings',
-      task: 'Node classification (community prediction)',
-      description: 'Large-scale social network from Reddit posts. Each node is a post, edges connect posts from same user.'
-    },
-    {
-      name: 'MUTAG',
-      icon: Atom,
-      category: 'Molecular',
-      nodes: '17.9 avg',
-      edges: '19.8 avg',
-      features: 7,
-      classes: 2,
-      featureType: 'Atom types',
-      task: 'Graph classification (mutagenicity)',
-      description: 'Chemical compounds dataset. Predict whether molecules are mutagenic (cancer-causing).'
-    },
-    {
-      name: 'PROTEINS',
-      icon: Dna,
-      category: 'Biological',
-      nodes: '39.1 avg',
-      edges: '72.8 avg',
-      features: 3,
-      classes: 2,
-      featureType: 'Amino acid types',
-      task: 'Graph classification (protein function)',
-      description: 'Protein structures dataset. Classify proteins as enzymes or non-enzymes based on structure.'
-    },
-    {
-      name: 'ZINC',
-      icon: Atom,
-      category: 'Molecular',
-      nodes: '23.2 avg',
-      edges: '24.9 avg',
-      features: 28,
-      classes: 'Regression',
-      featureType: 'Atom and bond features',
-      task: 'Graph regression (molecular properties)',
-      description: 'Drug-like molecules from ZINC database. Predict molecular properties like solubility.'
-    },
-    {
-      name: 'OGBN-Arxiv',
-      icon: Globe,
-      category: 'Academic Network',
-      nodes: 169343,
-      edges: 1166243,
-      features: 128,
-      classes: 40,
-      featureType: 'Paper embeddings',
-      task: 'Node classification (subject areas)',
-      description: 'ArXiv papers with citation network. Predict academic subject area of papers.'
-    }
-  ];
+  const [loading,     setLoading]     = useState(false);
+  const [error,       setError]       = useState(null);
 
   const handleUpload = async () => {
-    if (!uploadFiles.nodes) return;
-    
-    setLoading(true);
+    if (!files.nodes) return;
+    setLoading(true); setError(null);
     try {
-      const response = await api.uploadDataset(uploadFiles.nodes, uploadFiles.edges);
-      setUploadStats(response.data);
-      // Use the dataset_id returned from the server
-      onChange({ name: response.data.dataset_id, stats: response.data });
-    } catch (error) {
-      console.error('Upload failed:', error);
-    } finally {
-      setLoading(false);
-    }
+      const res = await api.uploadDataset(files.nodes, files.edges);
+      setUploadStats(res.data);
+      onChange({ name: res.data.dataset_id, stats: res.data });
+    } catch (e) {
+      setError(e.response?.data?.detail || 'Upload failed. Check your CSV format.');
+    } finally { setLoading(false); }
   };
 
   return (
     <div className="space-y-6">
-      <div className="card-neo rounded-2xl shadow-xl p-8">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center icon-neo-primary">
-              <Database className="w-5 h-5 text-white" />
-            </div>
-            <h2 className="text-xl font-semibold text-neo-primary">Dataset Selection</h2>
+      <div className="card p-6">
+        <div className="section-header">
+          <div>
+            <h2 className="section-title">Dataset</h2>
+            <p className="section-desc">Select a benchmark dataset or upload your own graph data.</p>
           </div>
           <button
-            onClick={() => setUploadMode(!uploadMode)}
-            className="btn-neo-secondary flex items-center space-x-2 px-4 py-2 rounded-lg"
+            onClick={() => { setUploadMode(!uploadMode); setUploadStats(null); setError(null); }}
+            className="btn-md btn-secondary gap-2"
           >
             <Upload className="w-4 h-4" />
-            <span>{uploadMode ? 'Use Built-in' : 'Upload Custom'}</span>
+            {uploadMode ? 'Browse datasets' : 'Upload CSV'}
           </button>
         </div>
 
-        {config?.name && config.name.startsWith('custom_') && (
-          <div className="mb-4 p-3 rounded-lg" style={{backgroundColor: 'rgba(59, 130, 246, 0.1)', border: '1px solid #3B82F6'}}>
-            <div className="flex items-center space-x-2">
-              <Upload className="w-4 h-4" style={{color: '#3B82F6'}} />
-              <span className="font-medium" style={{color: '#3B82F6'}}>Custom Dataset Selected</span>
-            </div>
-            <p className="text-sm text-neo-secondary mt-1">Using uploaded dataset: {config.name}</p>
+        {/* Custom active notice */}
+        {config?.name?.startsWith('custom_') && (
+          <div className="flex items-center gap-2 rounded-lg px-4 py-2.5 mb-4" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
+            <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: '#16A34A' }} />
+            <span className="text-sm font-medium" style={{ color: '#15803D' }}>Custom dataset active: <code className="font-mono">{config.name}</code></span>
           </div>
         )}
 
-        {!uploadMode ? (
-          <div className="space-y-6">
-            <h3 className="font-medium text-neo-primary">Available Datasets</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {datasets.map((dataset) => {
-                const Icon = dataset.icon;
-                const isSelected = config?.name === dataset.name;
-                return (
-                  <div
-                    key={dataset.name}
-                    onClick={() => {
-                      onChange({ name: dataset.name });
-                      setUploadStats(null); // Clear upload stats when selecting builtin
-                    }}
-                    className={`card-neo p-4 rounded-lg cursor-pointer transition-all duration-200 ${
-                      isSelected
-                        ? 'border-2 border-primary transform scale-105'
-                        : 'border-2 border-transparent hover:border-border-hover'
-                    }`}
-                    style={{
-                      borderColor: isSelected ? 'var(--primary)' : 'transparent',
-                      backgroundColor: isSelected ? 'var(--bg-elevated)' : 'var(--bg-surface)'
-                    }}
-                  >
-                    <div className="flex items-center space-x-3 mb-3">
-                      <div className={`p-2 rounded-lg ${
-                        isSelected ? 'icon-neo-primary' : 'bg-neo-elevated'
-                      }`}>
-                        <Icon className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-neo-primary">{dataset.name}</h4>
-                        <p className="text-xs text-neo-secondary">{dataset.category}</p>
-                      </div>
-                    </div>
-                    <p className="text-sm text-neo-secondary mb-3">{dataset.description}</p>
-                    <div className="grid grid-cols-2 gap-2 text-xs text-neo-secondary mb-2">
-                      <div><span className="font-medium">Nodes:</span> {dataset.nodes}</div>
-                      <div><span className="font-medium">Edges:</span> {dataset.edges}</div>
-                      <div><span className="font-medium">Features:</span> {dataset.features}</div>
-                      <div><span className="font-medium">Classes:</span> {dataset.classes}</div>
-                    </div>
-                    <div className="space-y-1 text-xs">
-                      <p><span className="font-medium text-neo-primary">Task:</span> <span className="text-neo-primary-color">{dataset.task}</span></p>
-                      <p><span className="font-medium text-neo-primary">Features:</span> <span className="text-neo-secondary">{dataset.featureType}</span></p>
-                    </div>
+        {/* Built-in grid */}
+        {!uploadMode && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {DATASETS.map(ds => {
+              const selected = config?.name === ds.name;
+              const catStyle  = CATEGORY_STYLE[ds.category] || { bg: '#F5F5F5', color: '#525252', border: '#EBEBEB' };
+              const taskStyle = TASK_STYLE[ds.task] || { color: '#525252' };
+              return (
+                <button
+                  key={ds.name}
+                  onClick={() => { onChange({ name: ds.name }); setUploadStats(null); }}
+                  className={`select-card text-left ${selected ? 'selected' : ''}`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold text-sm" style={{ color: '#0D0D0D' }}>{ds.name}</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: catStyle.bg, color: catStyle.color }}>{ds.category}</span>
                   </div>
-                );
-              })}
-            </div>
+                  <p className="text-xs mb-3 leading-relaxed line-clamp-2" style={{ color: '#737373' }}>{ds.desc}</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mb-2">
+                    <span style={{ color: '#BDBDBD' }}>Nodes <span className="font-medium" style={{ color: '#404040' }}>{ds.nodes}</span></span>
+                    <span style={{ color: '#BDBDBD' }}>Edges <span className="font-medium" style={{ color: '#404040' }}>{ds.edges}</span></span>
+                    <span style={{ color: '#BDBDBD' }}>Feats <span className="font-medium" style={{ color: '#404040' }}>{ds.features}</span></span>
+                    <span style={{ color: '#BDBDBD' }}>Classes <span className="font-medium" style={{ color: '#404040' }}>{ds.classes}</span></span>
+                  </div>
+                  <p className="text-xs font-medium" style={{ color: taskStyle.color }}>{ds.task}</p>
+                </button>
+              );
+            })}
           </div>
-        ) : (
-          <div className="space-y-6">
-            <div>
-              <h3 className="font-medium text-neo-primary mb-3">Upload Custom Dataset</h3>
-              <div className="p-4 rounded-lg" style={{backgroundColor: 'rgba(59, 130, 246, 0.1)', border: '1px solid #3B82F6'}}>
-                <h4 className="font-medium text-neo-primary mb-2">Dataset Requirements</h4>
-                <div className="space-y-3 text-sm text-neo-secondary">
-                  <div>
-                    <p className="font-medium text-neo-primary">Nodes CSV (Required):</p>
-                    <ul className="list-disc list-inside ml-2 space-y-1">
-                      <li><code className="bg-neo-elevated px-1 rounded">id</code> - Unique node identifier (integer)</li>
-                      <li><code className="bg-neo-elevated px-1 rounded">label</code> - Node class/target (integer)</li>
-                      <li><code className="bg-neo-elevated px-1 rounded">feature1, feature2, ...</code> - Node features (numeric)</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <p className="font-medium text-neo-primary">Edges CSV (Optional):</p>
-                    <ul className="list-disc list-inside ml-2 space-y-1">
-                      <li><code className="bg-neo-elevated px-1 rounded">source</code> - Source node ID (integer)</li>
-                      <li><code className="bg-neo-elevated px-1 rounded">target</code> - Target node ID (integer)</li>
-                      <li>If not provided, nodes will be treated as isolated (no edges)</li>
-                    </ul>
-                  </div>
-                  <div className="text-xs">
-                    <p><strong>Note:</strong> Node IDs in edges file must match IDs in nodes file. Edges are automatically made bidirectional.</p>
-                  </div>
+        )}
+
+        {/* Upload */}
+        {uploadMode && (
+          <div className="space-y-5">
+            <div className="rounded-lg p-4" style={{ background: '#ECFEFF', border: '1px solid #A5F3FC' }}>
+              <p className="text-sm font-medium mb-2 flex items-center gap-1.5" style={{ color: '#0E7490' }}>
+                <Info className="w-4 h-4" /> CSV format requirements
+              </p>
+              <div className="grid sm:grid-cols-2 gap-4 text-xs" style={{ color: '#0E7490' }}>
+                <div>
+                  <p className="font-semibold mb-1">Nodes CSV (required)</p>
+                  <ul className="space-y-0.5 list-disc list-inside">
+                    <li><code className="font-mono">id</code> — unique integer node ID</li>
+                    <li><code className="font-mono">label</code> — integer class/target</li>
+                    <li><code className="font-mono">feature1, feature2…</code> — numeric features</li>
+                  </ul>
+                </div>
+                <div>
+                  <p className="font-semibold mb-1">Edges CSV (optional)</p>
+                  <ul className="space-y-0.5 list-disc list-inside">
+                    <li><code className="font-mono">source</code> — source node ID</li>
+                    <li><code className="font-mono">target</code> — target node ID</li>
+                    <li>Edges are made bidirectional automatically</li>
+                  </ul>
                 </div>
               </div>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+            <div className="grid sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-neo-primary mb-2 flex items-center space-x-2">
-                  <span>Nodes CSV File <span className="text-red-500">*</span></span>
-                  <HelpTooltip content="CSV file containing node information. Must have 'id', 'label', and feature columns." />
-                </label>
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={(e) => setUploadFiles(prev => ({ ...prev, nodes: e.target.files[0] }))}
-                  className="input-neo w-full px-3 py-2 rounded-lg"
-                />
-                <p className="text-xs text-neo-secondary mt-1">
-                  Required: id, label, feature columns
-                </p>
+                <label className="label">Nodes CSV <span style={{ color: '#E60000' }}>*</span></label>
+                <input type="file" accept=".csv" onChange={e => setFiles(p => ({ ...p, nodes: e.target.files[0] }))} className="input" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-neo-primary mb-2 flex items-center space-x-2">
-                  <span>Edges CSV File <span className="text-neo-secondary">(Optional)</span></span>
-                  <HelpTooltip content="CSV file defining graph connections. Must have 'source' and 'target' columns. If omitted, nodes will be isolated." />
-                </label>
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={(e) => setUploadFiles(prev => ({ ...prev, edges: e.target.files[0] }))}
-                  className="input-neo w-full px-3 py-2 rounded-lg"
-                />
-                <p className="text-xs text-neo-secondary mt-1">
-                  Optional: source, target columns
-                </p>
+                <label className="label">Edges CSV <span style={{ color: '#BDBDBD' }}>(optional)</span></label>
+                <input type="file" accept=".csv" onChange={e => setFiles(p => ({ ...p, edges: e.target.files[0] }))} className="input" />
               </div>
             </div>
-            <button
-              onClick={handleUpload}
-              disabled={!uploadFiles.nodes || loading}
-              className="btn-neo-primary px-6 py-2 rounded-lg disabled:opacity-50"
-            >
-              {loading ? 'Uploading...' : 'Upload Dataset'}
+
+            {error && (
+              <div className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm" style={{ background: '#FFF0F0', border: '1px solid #FFB3B3', color: '#B30000' }}>
+                {error}
+              </div>
+            )}
+
+            <button onClick={handleUpload} disabled={!files.nodes || loading} className="btn-md btn-primary" style={{ opacity: (!files.nodes || loading) ? 0.4 : 1 }}>
+              {loading ? 'Uploading…' : 'Upload dataset'}
             </button>
           </div>
         )}
 
+        {/* Success */}
         {uploadStats && (
-          <div className="mt-6 p-4 rounded-lg" style={{backgroundColor: 'rgba(16, 185, 129, 0.1)', border: '1px solid #10B981'}}>
-            <div className="flex items-center space-x-2 mb-2">
-              <Info className="w-4 h-4" style={{color: '#10B981'}} />
-              <span className="font-medium" style={{color: '#10B981'}}>Dataset Uploaded Successfully</span>
+          <div className="mt-5 rounded-lg p-4" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
+            <div className="flex items-center gap-2 mb-3">
+              <CheckCircle2 className="w-4 h-4" style={{ color: '#16A34A' }} />
+              <span className="text-sm font-semibold" style={{ color: '#15803D' }}>Upload successful</span>
             </div>
-            <div className="mb-2 text-sm text-neo-secondary">
-              <span>Dataset ID: </span>
-              <span className="font-mono text-neo-primary">{uploadStats.dataset_id}</span>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm text-neo-secondary">
-              <div>
-                <span>Nodes:</span>
-                <span className="ml-2 font-medium text-neo-primary">{uploadStats.num_nodes}</span>
-              </div>
-              <div>
-                <span>Edges:</span>
-                <span className="ml-2 font-medium text-neo-primary">{uploadStats.num_edges}</span>
-              </div>
-              <div>
-                <span>Features:</span>
-                <span className="ml-2 font-medium text-neo-primary">{uploadStats.num_features}</span>
-              </div>
-              <div>
-                <span>Classes:</span>
-                <span className="ml-2 font-medium text-neo-primary">{uploadStats.num_classes}</span>
-              </div>
-              <div>
-                <span>Task:</span>
-                <span className="ml-2 font-medium text-neo-primary">
-                  {uploadStats.task_type === 'node_classification' ? 'Node Classification' : 
-                   uploadStats.task_type === 'graph_classification' ? 'Graph Classification' : 
-                   uploadStats.task_type}
-                </span>
-              </div>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+              {[['Nodes', uploadStats.num_nodes], ['Edges', uploadStats.num_edges], ['Features', uploadStats.num_features], ['Classes', uploadStats.num_classes],
+                ['Task', uploadStats.task_type === 'node_classification' ? 'Node Classification' : uploadStats.task_type]].map(([k, v]) => (
+                <div key={k}>
+                  <p style={{ color: '#737373' }}>{k}</p>
+                  <p className="font-semibold mt-0.5" style={{ color: '#0D0D0D' }}>{v}</p>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -318,5 +174,3 @@ function DatasetSelector({ config, onChange }) {
     </div>
   );
 }
-
-export default DatasetSelector;

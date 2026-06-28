@@ -944,30 +944,17 @@ class NeuronAnalysis(BaseExplainer):
         
         explanation = {
             'method': 'NeuronAnalysis',
-
-            # node_idx kept for visualization only
             'node_idx': node_idx,
-
-            # Override semantic meaning without breaking API
             'task_type': 'global',
-
             'neuron_concepts': neuron_concepts,
             'concept_rules': concept_rules,
-
-            # Feature importance is auxiliary, not causal
             'feature_importance': feature_importance,
             'top_features': top_features.tolist(),
-
             'prediction': predicted_class,
-
-            # IMPORTANT: clarify meaning of confidence
-            'confidence': prediction_confidence,  # model confidence, not explanation quality
+            'confidence': prediction_confidence,
             'confidence_type': 'model_certainty',
-
             'global_analysis': True,
-
-            # k-hop used only as context, not explanation scope
-            'num_hops_used': num_hops if task_type == 'node' else None,
+            'num_hops_used': locals().get('num_hops', None),
             'hop_usage_type': 'visualization_only',
 
             'logical_concepts': {
