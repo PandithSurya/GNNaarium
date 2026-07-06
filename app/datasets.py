@@ -22,32 +22,32 @@ def load_builtin_dataset(name):
     # Citation networks
     if name in ["Cora", "Citeseer", "PubMed"]:
         root = os.path.join(temp_dir, name)
-        # Delete stale processed cache that causes unpack errors with PyG version mismatch
-        processed_dir = os.path.join(root, name, 'processed')
-        if os.path.exists(processed_dir):
-            import shutil
-            shutil.rmtree(processed_dir)
+        # Always wipe processed cache to avoid version-mismatch unpack errors
+        import shutil
+        for sub in [os.path.join(root, name, 'processed'), os.path.join(root, 'processed')]:
+            if os.path.exists(sub):
+                shutil.rmtree(sub)
         dataset = Planetoid(root=root, name=name)
         data = dataset[0]
     
     # Reddit dataset
     elif name == "Reddit":
         root = os.path.join(temp_dir, "Reddit")
-        processed_dir = os.path.join(root, 'processed')
-        if os.path.exists(processed_dir):
-            import shutil
-            shutil.rmtree(processed_dir)
+        import shutil
+        for sub in [os.path.join(root, 'Reddit', 'processed'), os.path.join(root, 'processed')]:
+            if os.path.exists(sub):
+                shutil.rmtree(sub)
         dataset = Reddit(root=root)
         data = dataset[0]
     
     # TU datasets (molecular/protein)
     elif name in ["MUTAG", "PROTEINS"]:
         try:
+            import shutil
             root = os.path.join(temp_dir, name)
-            processed_dir = os.path.join(root, name, 'processed')
-            if os.path.exists(processed_dir):
-                import shutil
-                shutil.rmtree(processed_dir)
+            for sub in [os.path.join(root, name, 'processed'), os.path.join(root, 'processed')]:
+                if os.path.exists(sub):
+                    shutil.rmtree(sub)
             dataset = TUDataset(root=root, name=name)
             if len(dataset) == 0:
                 raise ValueError(f"Dataset {name} is empty")
@@ -67,11 +67,11 @@ def load_builtin_dataset(name):
     # ZINC dataset
     elif name == "ZINC":
         try:
+            import shutil
             root = os.path.join(temp_dir, "ZINC")
-            processed_dir = os.path.join(root, 'ZINC', 'processed')
-            if os.path.exists(processed_dir):
-                import shutil
-                shutil.rmtree(processed_dir)
+            for sub in [os.path.join(root, 'ZINC', 'processed'), os.path.join(root, 'processed')]:
+                if os.path.exists(sub):
+                    shutil.rmtree(sub)
             dataset = TUDataset(root=root, name="ZINC")
             if len(dataset) == 0:
                 raise ValueError("ZINC dataset is empty")

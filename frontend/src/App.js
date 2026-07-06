@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Zap, Database, Shield, Brain, Play, History,
   ChevronLeft, ChevronRight, LayoutDashboard, LogOut,
-  User, Menu, X, Network, Settings
+  User, Menu, X, AlertCircle, Network
 } from 'lucide-react';
 import Homepage from './components/Homepage';
 import DatasetSelector from './components/DatasetSelector';
@@ -13,6 +13,27 @@ import RunMonitor from './components/RunMonitor';
 import Playground from './components/Playground';
 import ExperimentHistory from './components/ExperimentHistory';
 import { api } from './api';
+
+/* ── Node-graph logo SVG ── */
+function GNNLogo({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      {/* nodes */}
+      <circle cx="12" cy="3.5" r="2"   fill="white" />
+      <circle cx="3.5" cy="18" r="2"   fill="white" />
+      <circle cx="20.5" cy="18" r="2"  fill="white" />
+      <circle cx="12"  cy="12" r="1.5" fill="white" fillOpacity="0.65" />
+      {/* edges from center */}
+      <line x1="12" y1="5.5"  x2="12"   y2="10.5" stroke="white" strokeWidth="1.3" strokeOpacity="0.9" />
+      <line x1="12" y1="12"   x2="5.2"  y2="16.4" stroke="white" strokeWidth="1.3" strokeOpacity="0.9" />
+      <line x1="12" y1="12"   x2="18.8" y2="16.4" stroke="white" strokeWidth="1.3" strokeOpacity="0.9" />
+      {/* outer dashed edges */}
+      <line x1="12" y1="5.5"  x2="5.2"  y2="16.4" stroke="white" strokeWidth="0.9" strokeOpacity="0.3" strokeDasharray="2.5 2" />
+      <line x1="12" y1="5.5"  x2="18.8" y2="16.4" stroke="white" strokeWidth="0.9" strokeOpacity="0.3" strokeDasharray="2.5 2" />
+      <line x1="5.2" y1="16.4" x2="18.8" y2="16.4" stroke="white" strokeWidth="0.9" strokeOpacity="0.3" strokeDasharray="2.5 2" />
+    </svg>
+  );
+}
 
 const NAV = [
   { id: 'playground',     label: 'Quick Start',     icon: Zap },
@@ -25,11 +46,11 @@ const NAV = [
 
 function ConfigStrip({ config }) {
   const chips = [
-    config.model?.name    || 'No model',
-    config.dataset?.name  || 'No dataset',
-    config.attack?.name   || 'No attack',
-    config.defense?.name  || 'No defense',
-    config.explainer?.name|| 'No explainer',
+    config.model?.name     || 'No model',
+    config.dataset?.name   || 'No dataset',
+    config.attack?.name    || 'No attack',
+    config.defense?.name   || 'No defense',
+    config.explainer?.name || 'No explainer',
   ];
   return (
     <div className="config-strip">
@@ -60,22 +81,28 @@ function UserMenu({ user, onLogout, onSignIn }) {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg transition-colors hover:bg-w-100"
+        className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg transition-colors btn-ghost"
       >
-        <div className="w-7 h-7 rounded-full bg-r-500 flex items-center justify-center flex-shrink-0">
+        <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ background: '#1A1A1A' }}>
           <span className="text-white text-xs font-semibold">{user.name?.[0]?.toUpperCase() || 'U'}</span>
         </div>
-        <span className="text-sm font-medium text-b-300 max-w-[120px] truncate hidden sm:block">{user.name}</span>
+        <span className="text-sm font-medium max-w-[120px] truncate hidden sm:block"
+          style={{ color: '#2E2E2E' }}>{user.name}</span>
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1.5 w-56 bg-white border border-w-200 rounded-xl shadow-md z-50 py-1 overflow-hidden">
+        <div className="absolute right-0 top-full mt-1.5 w-56 bg-white rounded-xl z-50 py-1 overflow-hidden"
+          style={{ border: '1px solid #EBEBEB', boxShadow: '0 4px 12px rgb(0 0 0/0.08)' }}>
           <div className="px-4 py-3" style={{ borderBottom: '1px solid #EBEBEB' }}>
-            <p className="text-sm font-semibold text-b-500 truncate">{user.name}</p>
-            <p className="text-xs text-b-50 truncate">{user.email}</p>
+            <p className="text-sm font-semibold truncate" style={{ color: '#0D0D0D' }}>{user.name}</p>
+            <p className="text-xs truncate" style={{ color: '#737373' }}>{user.email}</p>
           </div>
           <button
             onClick={() => { setOpen(false); onLogout(); }}
-            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-r-500 hover:bg-r-50 transition-colors"
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors"
+            style={{ color: '#E60000' }}
+            onMouseEnter={e => e.currentTarget.style.background = '#FFF0F0'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
           >
             <LogOut className="w-4 h-4" /> Sign out
           </button>
@@ -85,18 +112,18 @@ function UserMenu({ user, onLogout, onSignIn }) {
   );
 }
 
-function App() {
-  const [currentView,      setCurrentView]      = useState('homepage');
-  const [activeTab,        setActiveTab]         = useState('playground');
-  const [sidebarCollapsed, setSidebarCollapsed]  = useState(false);
-  const [mobileSidebarOpen,setMobileSidebarOpen] = useState(false);
+export default function App() {
+  const [currentView,       setCurrentView]       = useState('homepage');
+  const [activeTab,         setActiveTab]          = useState('playground');
+  const [sidebarCollapsed,  setSidebarCollapsed]   = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen]  = useState(false);
 
   const [config, setConfig] = useState({
-    dataset:  { name: 'Cora' },
-    model:    { name: 'GCN', hidden_dim: 64, dropout: 0.5, lr: 0.01, epochs: 50, seed: 42, weight_decay: 5e-4 },
-    attack:   null,
-    defense:  null,
-    explainer:null,
+    dataset:   { name: 'Cora' },
+    model:     { name: 'GCN', hidden_dim: 64, dropout: 0.5, lr: 0.01, epochs: 50, seed: 42, weight_decay: 5e-4 },
+    attack:    null,
+    defense:   null,
+    explainer: null,
   });
   const [currentRun,    setCurrentRun]    = useState(null);
   const [isRunning,     setIsRunning]     = useState(false);
@@ -105,11 +132,7 @@ function App() {
   const [user,  setUser]  = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token'));
 
-  const nav = [
-    ...NAV,
-    ...(user && token ? [{ id: 'history', label: 'History', icon: History }] : []),
-  ];
-
+  const nav = [...NAV, ...(user && token ? [{ id: 'history', label: 'History', icon: History }] : [])];
   const activeNav = nav.find(n => n.id === activeTab);
 
   const updateConfig = (section, data) => {
@@ -124,8 +147,7 @@ function App() {
     if (!token || !user) { alert('Please sign in to start training'); return; }
     if (isRunning) return;
     try {
-      setIsRunning(true);
-      setCurrentRun(null);
+      setIsRunning(true); setCurrentRun(null);
       const response = await api.startRun(config);
       setCurrentRun(response.data);
       setTrainedConfig(JSON.parse(JSON.stringify(config)));
@@ -134,8 +156,7 @@ function App() {
     } catch (error) {
       if (error.response?.status === 401) { alert('Please sign in'); handleLogout(); }
       else alert('Failed to start run: ' + (error.response?.data?.detail || error.message));
-      setIsRunning(false);
-      setCurrentRun(null);
+      setIsRunning(false); setCurrentRun(null);
     }
   };
 
@@ -145,10 +166,8 @@ function App() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setToken(null); setUser(null);
-    setCurrentView('homepage');
+    localStorage.removeItem('token'); localStorage.removeItem('user');
+    setToken(null); setUser(null); setCurrentView('homepage');
   };
 
   useEffect(() => {
@@ -169,43 +188,35 @@ function App() {
   }, [token]);
 
   if (currentView === 'homepage') {
-    return (
-      <Homepage
-        onTryItOut={() => setCurrentView('platform')}
-        onSignIn={handleGoogleSignIn}
-        user={user}
-        onLogout={handleLogout}
-      />
-    );
+    return <Homepage onTryItOut={() => setCurrentView('platform')} onSignIn={handleGoogleSignIn} user={user} onLogout={handleLogout} />;
   }
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: '#F5F5F5' }}>
 
-      {/* Mobile overlay */}
       {mobileSidebarOpen && (
         <div className="sidebar-overlay" onClick={() => setMobileSidebarOpen(false)} />
       )}
 
-      {/* Sidebar */}
+      {/* ── Sidebar ── */}
       <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
-        {/* Logo */}
+
+        {/* Logo — dark square with node-graph SVG */}
         <div className="flex items-center h-14 px-4 flex-shrink-0" style={{ borderBottom: '1px solid #EBEBEB' }}>
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-7 h-7 rounded-lg bg-r-500 flex items-center justify-center flex-shrink-0">
-              <Network className="w-4 h-4 text-white" />
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ background: '#0D0D0D' }}>
+              <GNNLogo size={18} />
             </div>
             {!sidebarCollapsed && (
-              <span className="font-semibold text-b-500 text-sm truncate">GNNaarium</span>
+              <span className="font-semibold text-sm truncate" style={{ color: '#0D0D0D' }}>GNNaarium</span>
             )}
           </div>
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             className="ml-auto hidden lg:flex items-center justify-center w-6 h-6 rounded-md btn-ghost flex-shrink-0"
           >
-            {sidebarCollapsed
-              ? <ChevronRight className="w-3.5 h-3.5" />
-              : <ChevronLeft  className="w-3.5 h-3.5" />}
+            {sidebarCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
           </button>
         </div>
 
@@ -241,16 +252,17 @@ function App() {
           })}
         </nav>
 
-        {/* Sidebar footer */}
+        {/* Footer */}
         {!sidebarCollapsed && (
           <div className="p-3 flex-shrink-0" style={{ borderTop: '1px solid #EBEBEB' }}>
             {user ? (
               <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-full bg-r-500 flex items-center justify-center flex-shrink-0">
+                <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ background: '#1A1A1A' }}>
                   <span className="text-white text-xs font-semibold">{user.name?.[0]?.toUpperCase()}</span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-b-500 truncate">{user.name}</p>
+                  <p className="text-xs font-semibold truncate" style={{ color: '#0D0D0D' }}>{user.name}</p>
                   <p className="text-xs truncate" style={{ color: '#737373' }}>{user.email}</p>
                 </div>
                 <button onClick={handleLogout} className="btn-ghost btn-sm p-1.5 rounded-md">
@@ -266,11 +278,12 @@ function App() {
         )}
       </aside>
 
-      {/* Main */}
+      {/* ── Main ── */}
       <div className={`main-content ${sidebarCollapsed ? 'sidebar-collapsed' : ''} flex-1 flex flex-col min-w-0 overflow-hidden`}>
 
         {/* Top bar */}
-        <header className="h-14 bg-white flex items-center px-4 gap-3 flex-shrink-0 z-20" style={{ borderBottom: '1px solid #EBEBEB' }}>
+        <header className="h-14 bg-white flex items-center px-4 gap-3 flex-shrink-0 z-20"
+          style={{ borderBottom: '1px solid #EBEBEB' }}>
           <button
             className="lg:hidden btn-ghost btn-sm p-1.5 rounded-md"
             onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
@@ -278,17 +291,17 @@ function App() {
             {mobileSidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
           </button>
 
-          {/* Breadcrumb */}
           <div className="flex items-center gap-1.5 text-sm min-w-0">
             <span style={{ color: '#BDBDBD' }}>Experiment</span>
             <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#D6D6D6' }} />
-            <span className="font-medium text-b-500 truncate">{activeNav?.label || 'Overview'}</span>
+            <span className="font-medium truncate" style={{ color: '#0D0D0D' }}>{activeNav?.label || 'Overview'}</span>
           </div>
 
-          {/* Config changed warning */}
+          {/* Config changed — fully monochrome, no red */}
           {configChanged && trainedConfig && (
-            <div className="hidden md:flex items-center gap-1.5 badge-red px-3 py-1.5 rounded-lg text-xs font-medium ml-2">
-              <div className="status-dot-red" />
+            <div className="hidden md:flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg ml-2"
+              style={{ background: '#F5F5F5', color: '#525252', border: '1px solid #EBEBEB' }}>
+              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#737373' }} />
               Config changed — retrain to apply
             </div>
           )}
@@ -302,22 +315,14 @@ function App() {
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-6xl mx-auto p-6 space-y-6">
 
-            {/* Config strip */}
             <div className="card p-3 hidden md:block">
               <ConfigStrip config={config} />
             </div>
 
             {activeTab === 'playground' && (
-              <Playground
-                config={config}
-                onConfigChange={setConfig}
-                onStartExperiment={startRun}
-                isRunning={isRunning}
-                user={user}
-                token={token}
-                onSignInClick={handleGoogleSignIn}
-                onNavigateToTab={setActiveTab}
-              />
+              <Playground config={config} onConfigChange={setConfig} onStartExperiment={startRun}
+                isRunning={isRunning} user={user} token={token}
+                onSignInClick={handleGoogleSignIn} onNavigateToTab={setActiveTab} />
             )}
             {activeTab === 'dataset' && (
               <DatasetSelector config={config.dataset} onChange={(d) => updateConfig('dataset', d)} />
@@ -327,28 +332,19 @@ function App() {
             )}
             {activeTab === 'attack-defense' && (
               <AttackDefenseConfig
-                attackConfig={config.attack}
-                defenseConfig={config.defense}
+                attackConfig={config.attack} defenseConfig={config.defense}
                 onAttackChange={(d) => updateConfig('attack', d)}
-                onDefenseChange={(d) => updateConfig('defense', d)}
-              />
+                onDefenseChange={(d) => updateConfig('defense', d)} />
             )}
             {activeTab === 'explainer' && (
               <ExplainerConfig config={config.explainer} onChange={(d) => updateConfig('explainer', d)} />
             )}
             {activeTab === 'run' && (
-              <RunMonitor
-                run={currentRun}
-                config={config}
+              <RunMonitor run={currentRun} config={config}
                 onRunComplete={() => { setIsRunning(false); setCurrentRun(null); }}
-                onStartRun={startRun}
-                isRunning={isRunning}
-                configChanged={configChanged}
-                trainedConfig={trainedConfig}
-                user={user}
-                token={token}
-                onSignInClick={handleGoogleSignIn}
-              />
+                onStartRun={startRun} isRunning={isRunning}
+                configChanged={configChanged} trainedConfig={trainedConfig}
+                user={user} token={token} onSignInClick={handleGoogleSignIn} />
             )}
             {activeTab === 'history' && <ExperimentHistory />}
           </div>
@@ -357,5 +353,3 @@ function App() {
     </div>
   );
 }
-
-export default App;

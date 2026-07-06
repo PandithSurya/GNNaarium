@@ -1,335 +1,295 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Network } from 'lucide-react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import ForceGraph2D from 'react-force-graph-2d';
+import { Share2, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 
-function GraphVisualization({ dataset, nodeExplanations, selectedNodes, attackConfig, defenseConfig, metrics, explainerConfig }) {
-  const canvasRef = useRef(null);
-  const [hoveredNode, setHoveredNode] = useState(null);
-  const [viewMode, setViewMode] = useState('original');
-  const [nodes, setNodes] = useState([]);
-  const [edges, setEdges] = useState([]);
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
+const DATASET_SIZES = { Cora: 60, Citeseer: 80, PubMed: 100 };
 
-  useEffect(() => {
-    if (!dataset) return;
-    const nodeCount = getNodeCount(dataset);
-    const newNodes = generateNodes(nodeCount, 800, 400);
-    const newEdges = generateEdges(newNodes);
-    setNodes(newNodes);
-    setEdges(newEdges);
-  }, [dataset]);
-
-  // Parse selected nodes from explainer config
-  const parsedSelectedNodes = React.useMemo(() => {
-    if (explainerConfig?.node_idx) {
-      if (typeof explainerConfig.node_idx === 'string') {
-        return explainerConfig.node_idx.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
-      } else {
-        return [parseInt(explainerConfig.node_idx)];
-      }
+function buildGraph(count) {
+  const nodes = Array.from({ length: count }, (_, i) => ({ id: i }));
+  const links = [];
+  const deg = new Array(count).fill(1);
+  for (let i = 1; i < count; i++) {
+    const conns = Math.min(i, 1 + Math.floor(Math.random() * 3));
+    const added = new Set();
+    for (let c = 0; c < conns; c++) {
+      const total = deg.slice(0, i).reduce((a, b) => a + b, 0);
+      let r = Math.random() * total, j = 0;
+      while (r > 0 && j < i - 1) { r -= deg[j]; j++; }
+      if (!added.has(j)) { links.push({ source: i, target: j, idx: links.length }); deg[i]++; deg[j]++; added.add(j); }
     }
-    return [];
+  }
+  return { nodes, links };
+}
+
+export default function GraphVisualization({ dataset, nodeExplanations, attackConfig, defenseConfig, explainerConfig }) {
+  const fgRef = useRef();
+  const containerRef = useRef();
+  const [graphData, setGraphData] = useState({ nodes: [], links: [] });
+  const [viewMode, setViewMode] = useState('original');
+  const [hovered, setHovered] = useState(null);
+  const [width, setWidth] = useState(800);
+
+  const parsedSelected = useMemo(() => {
+    const raw = explainerConfig?.node_idx;
+    if (!raw) return [];
+    return String(raw).split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
   }, [explainerConfig]);
 
+  // Build graph on dataset change
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const handleWheel = (event) => {
-      event.preventDefault();
-      const rect = canvas.getBoundingClientRect();
-      const mouseX = event.clientX - rect.left - canvas.width / 2;
-      const mouseY = event.clientY - rect.top - canvas.height / 2;
-      
-      const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
-      const newZoom = Math.max(0.5, Math.min(3, zoom * zoomFactor));
-      
-      const zoomChange = newZoom / zoom;
-      setPan(prev => ({
-        x: prev.x - mouseX * (zoomChange - 1),
-        y: prev.y - mouseY * (zoomChange - 1)
-      }));
-      
-      setZoom(newZoom);
-    };
-    
-    canvas.addEventListener('wheel', handleWheel, { passive: false });
-    
-    return () => {
-      canvas.removeEventListener('wheel', handleWheel);
-    };
-  }, [zoom, pan]);
-  
+    if (!dataset) return;
+    const count = DATASET_SIZES[dataset] || 60;
+    setGraphData(buildGraph(count));
+    setViewMode('original');
+  }, [dataset]);
+
+  // Fit view after graph loads
   useEffect(() => {
-    if (!canvasRef.current || nodes.length === 0) return;
-    
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    const width = canvas.width = canvas.parentElement.clientWidth - 32;
-    const height = canvas.height = 400;
-    
-    ctx.clearRect(0, 0, width, height);
-    
-    // Apply zoom and pan transformations
-    ctx.save();
-    ctx.translate(width / 2, height / 2);
-    ctx.scale(zoom, zoom);
-    ctx.translate(-width / 2 + pan.x, -height / 2 + pan.y);
-    
-    // Draw edges with attack/defense visualization
-    edges.forEach((edge, i) => {
-      let strokeStyle = '#4b5563';
-      let lineWidth = 1;
-      
-      if (viewMode === 'attacked' && attackConfig?.name && i % 10 < 2) {
-        strokeStyle = '#ef4444';
-        lineWidth = 2;
-      } else if (viewMode === 'defended' && defenseConfig?.name && i % 8 === 0) {
-        strokeStyle = '#10b981';
-        ctx.setLineDash([5, 5]);
-      }
-      
-      ctx.strokeStyle = strokeStyle;
-      ctx.lineWidth = lineWidth;
-      ctx.beginPath();
-      ctx.moveTo(edge.from.x, edge.from.y);
-      ctx.lineTo(edge.to.x, edge.to.y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    });
-    
-    // Get neighbors of selected nodes
-    const selectedNeighbors = new Set();
-    parsedSelectedNodes.forEach(selectedIdx => {
-      edges.forEach(edge => {
-        if (edge.from.id === selectedIdx) selectedNeighbors.add(edge.to.id);
-        if (edge.to.id === selectedIdx) selectedNeighbors.add(edge.from.id);
+    if (!graphData.nodes.length) return;
+    const t = setTimeout(() => fgRef.current?.zoomToFit(400, 40), 600);
+    return () => clearTimeout(t);
+  }, [graphData]);
+
+  // Responsive width
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const ro = new ResizeObserver(() => setWidth(containerRef.current.clientWidth));
+    ro.observe(containerRef.current);
+    setWidth(containerRef.current.clientWidth);
+    return () => ro.disconnect();
+  }, []);
+
+  const neighborSet = useMemo(() => {
+    const s = new Set();
+    parsedSelected.forEach(sid => {
+      graphData.links.forEach(({ source, target }) => {
+        const a = typeof source === 'object' ? source.id : source;
+        const b = typeof target === 'object' ? target.id : target;
+        if (a === sid) s.add(b);
+        if (b === sid) s.add(a);
       });
     });
-    
-    // Draw nodes
-    nodes.forEach((node, i) => {
-      const isSelected = parsedSelectedNodes.includes(i);
-      const hasExplanation = nodeExplanations?.some(exp => exp.node_idx === i);
-      const isHovered = hoveredNode === i;
-      const isNeighborOfSelected = selectedNeighbors.has(i);
-      
-      let fillColor = '#ffffff';
-      let strokeColor = '#d1d5db';
-      let radius = isHovered ? 8 : 6;
-      
-      if (isSelected) {
-        fillColor = '#3b82f6';
-        strokeColor = '#1d4ed8';
-        radius = 8;
-      } else if (hasExplanation) {
-        fillColor = '#10b981';
-        strokeColor = '#059669';
-      } else if (isNeighborOfSelected) {
-        fillColor = '#bfdbfe';
-        strokeColor = '#93c5fd';
-      }
-      
+    return s;
+  }, [parsedSelected, graphData.links]);
+
+  const nodeCanvasObject = useCallback((node, ctx, globalScale) => {
+    const id = node.id;
+    const isSelected  = parsedSelected.includes(id);
+    const hasExplain  = nodeExplanations?.some(e => e.node_idx === id);
+    const isNeighbor  = neighborSet.has(id);
+    const isHovered   = hovered?.id === id;
+
+    let r      = 4;
+    let fill   = '#2A2A2A';
+    let stroke = '#404040';
+    let glow   = null;
+
+    if (isSelected)      { r = 7;   fill = '#E60000'; stroke = '#FF4444'; glow = 'rgba(230,0,0,0.5)'; }
+    else if (hasExplain) { r = 6;   fill = '#22C55E'; stroke = '#16A34A'; glow = 'rgba(34,197,94,0.45)'; }
+    else if (isNeighbor) { r = 4.5; fill = '#3A3A3A'; stroke = '#555555'; }
+    else if (isHovered)  { r = 5.5; fill = '#525252'; stroke = '#737373'; glow = 'rgba(255,255,255,0.15)'; }
+
+    // Glow ring
+    if (glow) {
+      const grad = ctx.createRadialGradient(node.x, node.y, r * 0.5, node.x, node.y, r * 3.2);
+      grad.addColorStop(0, glow);
+      grad.addColorStop(1, 'transparent');
       ctx.beginPath();
-      ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
-      ctx.fillStyle = fillColor;
+      ctx.arc(node.x, node.y, r * 3.2, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
       ctx.fill();
-      
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = isSelected ? 2 : 1;
-      ctx.stroke();
-      
-      if (isSelected || hasExplanation || isHovered) {
-        ctx.fillStyle = '#000000';
-        ctx.font = '10px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(i.toString(), node.x, node.y - 12);
-      }
-    });
-    
-    ctx.restore();
-    
-  }, [nodes, edges, selectedNodes, nodeExplanations, hoveredNode, viewMode, attackConfig, defenseConfig, parsedSelectedNodes, zoom, pan]);
-
-
-
-  const getNodeCount = (dataset) => {
-    const counts = { Cora: 50, Citeseer: 60, PubMed: 80 };
-    return counts[dataset] || 50;
-  };
-
-  const generateNodes = (count, width = 800, height = 400) => {
-    const nodes = [];
-    const padding = 30;
-    for (let i = 0; i < count; i++) {
-      nodes.push({
-        x: padding + Math.random() * (width - 2 * padding),
-        y: padding + Math.random() * (height - 2 * padding),
-        id: i
-      });
     }
-    return nodes;
-  };
 
-  const generateEdges = (nodes) => {
-    const edges = [];
-    const edgeCount = Math.min(nodes.length * 2, 100);
-    for (let i = 0; i < edgeCount; i++) {
-      const from = nodes[Math.floor(Math.random() * nodes.length)];
-      const to = nodes[Math.floor(Math.random() * nodes.length)];
-      if (from !== to) {
-        edges.push({ from, to });
-      }
+    // Node body
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = (isSelected || hasExplain) ? 1.5 / globalScale : 0.8 / globalScale;
+    ctx.stroke();
+
+    // Label
+    if (isSelected || hasExplain || isHovered) {
+      const label = String(id);
+      const fs = Math.max(8, 11 / globalScale);
+      ctx.font = `600 ${fs}px Inter, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillStyle = isSelected ? '#FF8080' : hasExplain ? '#86EFAC' : '#BDBDBD';
+      ctx.fillText(label, node.x, node.y - r - 2 / globalScale);
     }
-    return edges;
-  };
+  }, [parsedSelected, nodeExplanations, neighborSet, hovered]);
+
+  const linkColor = useCallback((link) => {
+    if (viewMode === 'attacked' && attackConfig?.name && link.idx % 9 < 2) return 'rgba(230,0,0,0.7)';
+    if (viewMode === 'defended' && defenseConfig?.name && link.idx % 7 === 0) return 'rgba(34,197,94,0.6)';
+    const a = typeof link.source === 'object' ? link.source.id : link.source;
+    const b = typeof link.target === 'object' ? link.target.id : link.target;
+    if (parsedSelected.includes(a) || parsedSelected.includes(b)) return 'rgba(80,80,80,0.8)';
+    return 'rgba(40,40,40,0.9)';
+  }, [viewMode, attackConfig, defenseConfig, parsedSelected]);
+
+  const linkWidth = useCallback((link) => {
+    if (viewMode === 'attacked' && attackConfig?.name && link.idx % 9 < 2) return 1.5;
+    if (viewMode === 'defended' && defenseConfig?.name && link.idx % 7 === 0) return 1.2;
+    return 0.6;
+  }, [viewMode, attackConfig, defenseConfig]);
+
+  const linkDirectionalParticles = useCallback((link) => {
+    if (viewMode === 'attacked' && attackConfig?.name && link.idx % 9 < 2) return 3;
+    if (viewMode === 'defended' && defenseConfig?.name && link.idx % 7 === 0) return 2;
+    return 0;
+  }, [viewMode, attackConfig, defenseConfig]);
+
+  const linkDirectionalParticleColor = useCallback((link) => {
+    if (viewMode === 'attacked') return '#FF4444';
+    return '#4ADE80';
+  }, [viewMode]);
+
+  const modes = [
+    { key: 'original', label: 'Original' },
+    ...(attackConfig?.name  ? [{ key: 'attacked', label: 'Attacked' }]  : []),
+    ...(defenseConfig?.name ? [{ key: 'defended', label: 'Defended' }] : []),
+  ];
+
+  const legendItems = [
+    { fill: '#2A2A2A', stroke: '#404040', label: 'Node' },
+    ...(parsedSelected.length        ? [{ fill: '#E60000', stroke: '#FF4444', label: 'Selected' }]  : []),
+    ...(nodeExplanations?.length     ? [{ fill: '#22C55E', stroke: '#16A34A', label: 'Explained' }] : []),
+    ...(parsedSelected.length        ? [{ fill: '#3A3A3A', stroke: '#555555', label: 'Neighbor' }]  : []),
+  ];
+
+  if (!dataset) return null;
 
   return (
-    <div className="card-neo rounded-2xl shadow-xl p-8">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center icon-neo-primary">
-            <Network className="w-5 h-5 text-white" />
-          </div>
-          <h3 className="text-xl font-semibold text-neo-primary">Interactive Graph</h3>
-        </div>
-        
-        <div className="flex space-x-1 card-neo rounded-lg p-1">
-          <button
-            onClick={() => setViewMode('original')}
-            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-              viewMode === 'original' ? 'btn-neo-primary' : 'btn-neo-secondary'
-            }`}
-          >
-            Original
-          </button>
-          {attackConfig?.name && (
-            <button
-              onClick={() => setViewMode('attacked')}
-              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                viewMode === 'attacked' ? 'btn-neo-primary' : 'btn-neo-secondary'
-              }`}
-            >
-              Attacked
-            </button>
-          )}
-          {defenseConfig?.name && (
-            <button
-              onClick={() => setViewMode('defended')}
-              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                viewMode === 'defended' ? 'btn-neo-primary' : 'btn-neo-secondary'
-              }`}
-            >
-              Defended
-            </button>
+    <div className="card overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #EBEBEB' }}>
+        <div className="flex items-center gap-2.5">
+          <Share2 className="w-4 h-4" style={{ color: '#BDBDBD' }} />
+          <h3 className="font-semibold" style={{ fontSize: 15, color: '#0D0D0D' }}>Graph structure</h3>
+          <span className="badge badge-bw">{dataset}</span>
+          {graphData.nodes.length > 0 && (
+            <span className="text-xs" style={{ color: '#BDBDBD' }}>
+              {graphData.nodes.length} nodes · {graphData.links.length} edges
+            </span>
           )}
         </div>
-      </div>
-      
-      <div className="card-neo rounded-lg p-4">
-        <canvas 
-          ref={canvasRef}
-          onMouseDown={(event) => {
-            setIsDragging(true);
-            setLastMousePos({ x: event.clientX, y: event.clientY });
-          }}
-          onMouseMove={(event) => {
-            const canvas = canvasRef.current;
-            const rect = canvas.getBoundingClientRect();
-            const x = (event.clientX - rect.left - pan.x) / zoom;
-            const y = (event.clientY - rect.top - pan.y) / zoom;
-            
-            if (isDragging) {
-              const deltaX = event.clientX - lastMousePos.x;
-              const deltaY = event.clientY - lastMousePos.y;
-              setPan(prev => ({ x: prev.x + deltaX, y: prev.y + deltaY }));
-              setLastMousePos({ x: event.clientX, y: event.clientY });
-              canvas.style.cursor = 'grabbing';
-            } else {
-              const hoveredNodeIndex = nodes.findIndex(node => {
-                const distance = Math.sqrt((x - node.x) ** 2 + (y - node.y) ** 2);
-                return distance <= 10;
-              });
-              
-              setHoveredNode(hoveredNodeIndex >= 0 ? hoveredNodeIndex : null);
-              canvas.style.cursor = hoveredNodeIndex >= 0 ? 'pointer' : 'grab';
-            }
-          }}
-          onMouseUp={() => {
-            setIsDragging(false);
-          }}
-          onMouseLeave={() => {
-            setIsDragging(false);
-            setHoveredNode(null);
-          }}
 
-          className="rounded"
-          style={{ maxWidth: '100%', border: '1px solid var(--border)', cursor: 'grab' }}
-        />
-        
+        <div className="flex items-center gap-2">
+          {/* Zoom controls */}
+          <div className="flex items-center gap-1">
+            {[
+              { icon: ZoomIn,    fn: () => fgRef.current?.zoom(fgRef.current.zoom() * 1.3, 200), title: 'Zoom in'  },
+              { icon: ZoomOut,   fn: () => fgRef.current?.zoom(fgRef.current.zoom() * 0.75, 200), title: 'Zoom out' },
+              { icon: RotateCcw, fn: () => fgRef.current?.zoomToFit(300, 40), title: 'Fit'  },
+            ].map(({ icon: Icon, fn, title }) => (
+              <button key={title} onClick={fn} title={title}
+                className="btn-sm btn-secondary"
+                style={{ padding: '4px 8px', height: 28 }}>
+                <Icon className="w-3.5 h-3.5" />
+              </button>
+            ))}
+          </div>
 
-        
-        <div className="flex items-center space-x-4 mt-3 text-sm text-neo-secondary">
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 bg-white border border-gray-300 rounded-full"></div>
-            <span>Regular nodes</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-            <span>Selected for explanation</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 bg-blue-300 rounded-full"></div>
-            <span>Neighbor of selected</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 bg-green-600 rounded-full"></div>
-            <span>Explanation computed</span>
-          </div>
-          {viewMode === 'attacked' && (
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-1 bg-red-500"></div>
-              <span>Attack edges</span>
+          {/* View mode tabs */}
+          {modes.length > 1 && (
+            <div className="flex items-center gap-1 p-1 rounded-lg" style={{ background: '#F5F5F5' }}>
+              {modes.map(m => (
+                <button key={m.key} onClick={() => setViewMode(m.key)}
+                  className="btn-sm"
+                  style={{
+                    background: viewMode === m.key ? '#FFFFFF' : 'transparent',
+                    color: viewMode === m.key ? '#0D0D0D' : '#737373',
+                    boxShadow: viewMode === m.key ? '0 1px 2px rgb(0 0 0/0.08)' : 'none',
+                    border: viewMode === m.key ? '1px solid #EBEBEB' : '1px solid transparent',
+                    borderRadius: 6, height: 26,
+                  }}>
+                  {m.key === 'attacked' && <span className="w-1.5 h-1.5 rounded-full inline-block mr-1" style={{ background: '#E60000' }} />}
+                  {m.key === 'defended' && <span className="w-1.5 h-1.5 rounded-full inline-block mr-1" style={{ background: '#22C55E' }} />}
+                  {m.label}
+                </button>
+              ))}
             </div>
           )}
         </div>
-        
-        <div className="flex justify-between items-center mt-3">
-          <div className="text-xs text-neo-secondary">
-            Switch views to compare attack/defense effects
+      </div>
+
+      {/* Graph canvas */}
+      <div ref={containerRef} style={{ background: '#0A0A0A', position: 'relative' }}>
+        <ForceGraph2D
+          ref={fgRef}
+          graphData={graphData}
+          width={width}
+          height={420}
+          backgroundColor="#0A0A0A"
+          nodeCanvasObject={nodeCanvasObject}
+          nodeCanvasObjectMode={() => 'replace'}
+          linkColor={linkColor}
+          linkWidth={linkWidth}
+          linkDirectionalParticles={linkDirectionalParticles}
+          linkDirectionalParticleWidth={2}
+          linkDirectionalParticleSpeed={0.004}
+          linkDirectionalParticleColor={linkDirectionalParticleColor}
+          onNodeHover={setHovered}
+          nodePointerAreaPaint={(node, color, ctx) => {
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, 10, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+          }}
+          cooldownTicks={120}
+          d3AlphaDecay={0.02}
+          d3VelocityDecay={0.3}
+          enableNodeDrag={true}
+          enableZoomInteraction={true}
+          minZoom={0.3}
+          maxZoom={6}
+        />
+
+        {/* Hover tooltip */}
+        {hovered && (
+          <div className="absolute top-3 left-3 text-xs rounded-lg px-3 py-2.5 pointer-events-none"
+            style={{ background: '#1A1A1A', border: '1px solid #2A2A2A', color: '#FFFFFF', boxShadow: '0 4px 20px rgb(0 0 0/0.5)' }}>
+            <p className="font-semibold mb-1">Node {hovered.id}</p>
+            {parsedSelected.includes(hovered.id) && <p style={{ color: '#FF8080' }}>● Selected for explanation</p>}
+            {nodeExplanations?.some(e => e.node_idx === hovered.id) && <p style={{ color: '#86EFAC' }}>● Explanation computed</p>}
+            {neighborSet.has(hovered.id) && !parsedSelected.includes(hovered.id) && <p style={{ color: '#737373' }}>● Neighbor of selected</p>}
+            {!parsedSelected.includes(hovered.id) && !nodeExplanations?.some(e => e.node_idx === hovered.id) && !neighborSet.has(hovered.id) && (
+              <p style={{ color: '#525252' }}>Regular node</p>
+            )}
           </div>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => {
-                const newZoom = Math.min(3, zoom * 1.2);
-                setZoom(newZoom);
-              }}
-              className="btn-neo-secondary px-2 py-1 text-xs rounded"
-            >
-              Zoom In
-            </button>
-            <button
-              onClick={() => {
-                const newZoom = Math.max(0.5, zoom * 0.8);
-                setZoom(newZoom);
-              }}
-              className="btn-neo-secondary px-2 py-1 text-xs rounded"
-            >
-              Zoom Out
-            </button>
-            <button
-              onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
-              className="btn-neo-secondary px-2 py-1 text-xs rounded"
-            >
-              Reset
-            </button>
+        )}
+
+        <p className="absolute bottom-3 left-3 text-xs" style={{ color: '#2A2A2A' }}>
+          Scroll to zoom · drag nodes · drag canvas to pan
+        </p>
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-3"
+        style={{ borderTop: '1px solid #141414', background: '#0F0F0F' }}>
+        {legendItems.map(item => (
+          <div key={item.label} className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+              style={{ background: item.fill, border: `1.5px solid ${item.stroke}` }} />
+            <span className="text-xs" style={{ color: '#525252' }}>{item.label}</span>
           </div>
-        </div>
+        ))}
+        {viewMode === 'attacked' && attackConfig?.name && (
+          <div className="flex items-center gap-1.5">
+            <span className="w-4 h-0.5 rounded-full" style={{ background: '#E60000' }} />
+            <span className="text-xs" style={{ color: '#525252' }}>Attack edge</span>
+          </div>
+        )}
+        {viewMode === 'defended' && defenseConfig?.name && (
+          <div className="flex items-center gap-1.5">
+            <span className="w-4 h-0.5 rounded-full" style={{ background: '#22C55E' }} />
+            <span className="text-xs" style={{ color: '#525252' }}>Defense edge</span>
+          </div>
+        )}
       </div>
     </div>
   );
 }
-
-export default GraphVisualization;

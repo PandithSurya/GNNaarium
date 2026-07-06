@@ -194,10 +194,10 @@ async def websocket_endpoint(websocket: WebSocket, run_id: int, token: str = Non
             pass
 
 @router.get("/experiments")
-async def list_experiments(limit: int = 100, skip: int = 0):
-    """Get experiments from MongoDB"""
+async def list_experiments(limit: int = 100, skip: int = 0, current_user: dict = Depends(get_current_user)):
+    """Get experiments from MongoDB for current user only"""
     try:
-        experiments = await get_experiments(limit, skip, None)
+        experiments = await get_experiments(limit, skip, current_user.get("email"))
         return {"experiments": experiments}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

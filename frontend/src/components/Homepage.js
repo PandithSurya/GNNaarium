@@ -1,9 +1,26 @@
 import React, { useState } from 'react';
-import { Network, Shield, Brain, BarChart3, ArrowRight, Database, Zap, Eye, ChevronDown, ChevronUp, LogOut, User } from 'lucide-react';
+import { Shield, Brain, BarChart3, ArrowRight, Database, Zap, Eye, ChevronDown, ChevronUp, LogOut, User } from 'lucide-react';
+
+function GNNLogo({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="3.5"  r="2"   fill="white" />
+      <circle cx="3.5" cy="18"  r="2"   fill="white" />
+      <circle cx="20.5" cy="18" r="2"   fill="white" />
+      <circle cx="12"  cy="12" r="1.5" fill="white" fillOpacity="0.65" />
+      <line x1="12" y1="5.5"  x2="12"   y2="10.5" stroke="white" strokeWidth="1.3" strokeOpacity="0.9" />
+      <line x1="12" y1="12"   x2="5.2"  y2="16.4" stroke="white" strokeWidth="1.3" strokeOpacity="0.9" />
+      <line x1="12" y1="12"   x2="18.8" y2="16.4" stroke="white" strokeWidth="1.3" strokeOpacity="0.9" />
+      <line x1="12" y1="5.5"  x2="5.2"  y2="16.4" stroke="white" strokeWidth="0.9" strokeOpacity="0.3" strokeDasharray="2.5 2" />
+      <line x1="12" y1="5.5"  x2="18.8" y2="16.4" stroke="white" strokeWidth="0.9" strokeOpacity="0.3" strokeDasharray="2.5 2" />
+      <line x1="5.2" y1="16.4" x2="18.8" y2="16.4" stroke="white" strokeWidth="0.9" strokeOpacity="0.3" strokeDasharray="2.5 2" />
+    </svg>
+  );
+}
 
 const FEATURES = [
   { icon: Brain,     title: 'GNN Architectures',    desc: 'GCN, GAT, GIN, GraphSAGE, GraphTransformer, and KA-GNN with configurable hyperparameters.',  bg: '#FAF5FF', color: '#9333EA' },
-  { icon: Shield,    title: 'Attack & Defense',      desc: 'FGSM, PGD, Nettack, Metattack adversarial attacks paired with state-of-the-art defenses.',   bg: '#FFF0F0', color: '#E60000' },
+  { icon: Shield,    title: 'Attack & Defense',      desc: 'FGSM, PGD, Nettack, Metattack adversarial attacks paired with state-of-the-art defenses.',   bg: '#FFF7ED', color: '#EA580C' },
   { icon: Eye,       title: 'Explainability',        desc: 'GNNExplainer, PGExplainer, SubgraphX, ProtGNN and more for model interpretability.',          bg: '#FAF5FF', color: '#9333EA' },
   { icon: BarChart3, title: 'Real-time Monitoring',  desc: 'Live training metrics streamed over WebSocket with interactive charts and logs.',              bg: '#F0FDF4', color: '#16A34A' },
   { icon: Database,  title: 'Datasets',              desc: 'Cora, Citeseer, PubMed, Reddit, MUTAG, PROTEINS, ZINC, OGBN-Arxiv or upload your own.',       bg: '#ECFEFF', color: '#0891B2' },
@@ -14,7 +31,7 @@ const STATS = [
   { label: 'Cora · 2,708 nodes',    color: '#9333EA' },
   { label: 'PubMed · 19,717 nodes', color: '#0891B2' },
   { label: '6 GNN architectures',   color: '#16A34A' },
-  { label: '6 attack methods',      color: '#E60000' },
+  { label: '6 attack methods',      color: '#EA580C' },
   { label: '6 defense strategies',  color: '#D97706' },
   { label: '6 explainers',          color: '#9333EA' },
 ];
@@ -29,7 +46,7 @@ const FAQS = [
 const STEPS = [
   { step: '01', title: 'Choose Dataset',       desc: 'Pick a benchmark or upload your own CSV.',               bg: '#ECFEFF', border: '#A5F3FC', color: '#0891B2' },
   { step: '02', title: 'Configure Model',      desc: 'Select a GNN architecture and hyperparameters.',         bg: '#FAF5FF', border: '#E9D5FF', color: '#9333EA' },
-  { step: '03', title: 'Add Attack & Defense', desc: 'Test robustness with adversarial scenarios.',            bg: '#FFF0F0', border: '#FFB3B3', color: '#E60000' },
+  { step: '03', title: 'Add Attack & Defense', desc: 'Test robustness with adversarial scenarios.',            bg: '#FFF7ED', border: '#FED7AA', color: '#EA580C' },
   { step: '04', title: 'Train & Analyze',      desc: 'Monitor live metrics and interpret results.',            bg: '#F0FDF4', border: '#BBF7D0', color: '#16A34A' },
 ];
 
@@ -67,8 +84,8 @@ export default function Homepage({ onTryItOut, onSignIn, user, onLogout }) {
       <header className="fixed top-0 inset-x-0 z-50 bg-white" style={{ borderBottom: '1px solid #EBEBEB' }}>
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: '#E60000' }}>
-              <Network className="w-4 h-4 text-white" />
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: '#0D0D0D' }}>
+              <GNNLogo size={18} />
             </div>
             <span className="font-semibold" style={{ color: '#0D0D0D' }}>GNNaarium</span>
           </div>
@@ -76,7 +93,11 @@ export default function Homepage({ onTryItOut, onSignIn, user, onLogout }) {
             {user ? (
               <>
                 <span className="text-sm hidden sm:block" style={{ color: '#525252' }}>{user.name}</span>
-                <button onClick={onTryItOut} className="btn-md btn-primary">Open Platform</button>
+                <button onClick={onTryItOut} className="btn-md"
+                  style={{ background: '#0D0D0D', color: '#FFFFFF' }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#2A2A2A'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#0D0D0D'}
+                >Open Platform</button>
                 <button onClick={onLogout} className="btn-md btn-secondary" style={{ padding: '8px' }}>
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -86,7 +107,11 @@ export default function Homepage({ onTryItOut, onSignIn, user, onLogout }) {
                 <button onClick={onSignIn} className="btn-md btn-secondary hidden sm:flex">
                   <User className="w-4 h-4" /> Sign in
                 </button>
-                <button onClick={onTryItOut} className="btn-md btn-primary">Get started</button>
+                <button onClick={onTryItOut} className="btn-md"
+                  style={{ background: '#0D0D0D', color: '#FFFFFF' }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#2A2A2A'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#0D0D0D'}
+                >Get started</button>
               </>
             )}
           </div>
@@ -97,20 +122,24 @@ export default function Homepage({ onTryItOut, onSignIn, user, onLogout }) {
 
         {/* Hero */}
         <section className="max-w-7xl mx-auto px-6 pt-20 pb-24 text-center">
-          <div className="inline-flex items-center gap-2 mb-6 px-3 py-1 rounded-full text-xs font-medium" style={{ background: '#FFF0F0', color: '#E60000' }}>
-            <span className="status-dot-pulse" />
+          <div className="inline-flex items-center gap-2 mb-6 px-3 py-1 rounded-full text-xs font-medium" style={{ background: '#F5F5F5', color: '#525252', border: '1px solid #EBEBEB' }}>
+            <span className="status-dot-dark" />
             Open research platform
           </div>
           <h1 className="text-5xl sm:text-6xl font-semibold tracking-tight leading-tight max-w-3xl mx-auto" style={{ color: '#0D0D0D', textWrap: 'balance' }}>
             Graph Neural Network<br />
-            <span style={{ color: '#E60000' }}>Robustness Analysis</span>
+            <span style={{ color: '#0D0D0D' }}>Robustness Analysis</span>
           </h1>
           <p className="mt-6 text-lg max-w-2xl mx-auto leading-relaxed" style={{ color: '#737373', textWrap: 'balance' }}>
             Train, attack, defend, and explain GNN models in a professional research environment.
             Built for AI researchers, ML engineers, and universities.
           </p>
           <div className="mt-10 flex items-center justify-center gap-3 flex-wrap">
-            <button onClick={onTryItOut} className="btn-lg btn-primary gap-2" style={{ fontSize: '15px', padding: '10px 24px' }}>
+            <button onClick={onTryItOut} className="btn-lg gap-2"
+              style={{ background: '#0D0D0D', color: '#FFFFFF', fontSize: '15px', padding: '10px 24px' }}
+              onMouseEnter={e => e.currentTarget.style.background = '#2A2A2A'}
+              onMouseLeave={e => e.currentTarget.style.background = '#0D0D0D'}
+            >
               Start experimenting <ArrowRight className="w-4 h-4" />
             </button>
             {!user && (
@@ -179,14 +208,14 @@ export default function Homepage({ onTryItOut, onSignIn, user, onLogout }) {
         </section>
 
         {/* CTA */}
-        <section style={{ background: '#E60000' }} className="py-20">
+        <section style={{ background: '#0D0D0D' }} className="py-20">
           <div className="max-w-3xl mx-auto px-6 text-center">
             <h2 className="text-3xl font-semibold text-white tracking-tight">Ready to explore GNN robustness?</h2>
-            <p className="mt-4 max-w-xl mx-auto" style={{ color: 'rgba(255,255,255,0.8)' }}>Start your first experiment in under a minute.</p>
+            <p className="mt-4 max-w-xl mx-auto" style={{ color: 'rgba(255,255,255,0.5)' }}>Start your first experiment in under a minute.</p>
             <button
               onClick={onTryItOut}
               className="mt-8 btn-lg gap-2 font-semibold"
-              style={{ background: 'white', color: '#E60000', padding: '10px 32px', fontSize: '15px' }}
+              style={{ background: 'white', color: '#0D0D0D', padding: '10px 32px', fontSize: '15px' }}
             >
               Open the platform <ArrowRight className="w-4 h-4" />
             </button>
@@ -197,8 +226,8 @@ export default function Homepage({ onTryItOut, onSignIn, user, onLogout }) {
         <footer className="bg-white" style={{ borderTop: '1px solid #EBEBEB' }}>
           <div className="max-w-7xl mx-auto px-6 py-8 flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: '#E60000' }}>
-                <Network className="w-3 h-3 text-white" />
+              <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: '#0D0D0D' }}>
+                <GNNLogo size={12} />
               </div>
               <span className="text-sm font-medium" style={{ color: '#525252' }}>GNNaarium</span>
             </div>

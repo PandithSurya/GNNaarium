@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Activity, TerminalSquare, AlertTriangle } from 'lucide-react';
+import { Play, Cpu, Terminal, AlertTriangle, Hash, Timer, Microscope, AlertCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { api } from '../api';
 import GraphVisualization from './GraphVisualization';
@@ -7,32 +7,35 @@ import MetricsPanel from './MetricsPanel';
 import ExplanationVisualization from './ExplanationVisualization';
 
 const STATUS = {
-  idle:      { label: 'Idle',      bg: '#F5F5F5', color: '#525252', dot: '#BDBDBD',  pulse: false },
-  running:   { label: 'Running',   bg: '#FFF0F0', color: '#E60000', dot: '#E60000',  pulse: true  },
-  completed: { label: 'Completed', bg: '#F0FDF4', color: '#16A34A', dot: '#16A34A',  pulse: false },
-  error:     { label: 'Error',     bg: '#FFF0F0', color: '#E60000', dot: '#E60000',  pulse: false },
-  stopped:   { label: 'Stopped',   bg: '#FFFBEB', color: '#D97706', dot: '#D97706',  pulse: false },
+  idle:      { label: 'Idle',      bg: '#F5F5F5', color: '#737373', dot: '#D6D6D6', pulse: false },
+  running:   { label: 'Running',   bg: '#F5F5F5', color: '#0D0D0D', dot: '#0D0D0D', pulse: true  },
+  completed: { label: 'Completed', bg: '#F5F5F5', color: '#0D0D0D', dot: '#0D0D0D', pulse: false },
+  error:     { label: 'Error',     bg: '#FFF0F0', color: '#E60000', dot: '#E60000', pulse: false },
+  stopped:   { label: 'Stopped',   bg: '#F5F5F5', color: '#737373', dot: '#737373', pulse: false },
 };
 
 const LINES = [
-  { key: 'val_acc',    name: 'Val Accuracy',       color: '#16A34A' },
+  { key: 'val_acc',    name: 'Val Accuracy',       color: '#0D0D0D' },
   { key: 'train_loss', name: 'Train Loss',          color: '#E60000' },
-  { key: 'asr',        name: 'Attack Success Rate', color: '#EA580C', cond: true },
-  { key: 'robust_acc', name: 'Robust Accuracy',     color: '#0891B2', cond: true },
+  { key: 'asr',        name: 'Attack Success Rate', color: '#737373', cond: true },
+  { key: 'robust_acc', name: 'Robust Accuracy',     color: '#404040', cond: true },
 ];
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-white rounded-lg shadow-md px-3 py-2.5 text-xs" style={{ border: '1px solid #EBEBEB' }}>
+    <div className="bg-white rounded-lg px-3 py-2.5 text-xs"
+      style={{ border: '1px solid #EBEBEB', boxShadow: '0 4px 12px rgb(0 0 0/0.08)' }}>
       <p className="font-semibold mb-1.5" style={{ color: '#525252' }}>Epoch {label}</p>
       {payload.map(p => (
         <div key={p.dataKey} className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }} />
+            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
             <span style={{ color: '#737373' }}>{p.name}</span>
           </div>
-          <span className="font-semibold" style={{ color: p.color }}>{typeof p.value === 'number' ? p.value.toFixed(4) : p.value}</span>
+          <span className="font-semibold" style={{ color: '#0D0D0D' }}>
+            {typeof p.value === 'number' ? p.value.toFixed(4) : p.value}
+          </span>
         </div>
       ))}
     </div>
@@ -119,27 +122,39 @@ export default function RunMonitor({ run, config, onRunComplete, onStartRun, isR
     return (
       <div className="space-y-5">
         <div className="card p-6">
-          <h2 className="section-title mb-1">Training monitor</h2>
+          <div className="flex items-center gap-2 mb-1">
+            <Cpu className="w-4 h-4" style={{ color: '#BDBDBD' }} />
+            <h2 className="section-title">Training monitor</h2>
+          </div>
           <p className="section-desc mb-6">Review your configuration and start training.</p>
 
           {configChanged && trainedConfig && (
-            <div className="flex items-center gap-2 rounded-lg px-4 py-2.5 mb-5 text-sm" style={{ background: '#FFFBEB', border: '1px solid #FDE68A', color: '#92400E' }}>
-              <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: '#D97706' }} />
+            <div className="flex items-center gap-2.5 rounded-lg px-4 py-2.5 mb-5 text-sm"
+              style={{ background: '#F5F5F5', border: '1px solid #D6D6D6', color: '#525252' }}>
+              <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: '#737373' }} />
               Configuration changed — retrain to apply the new settings.
             </div>
           )}
 
           {(!token || !user) && (
-            <div className="flex items-start gap-3 rounded-lg px-4 py-3 mb-5" style={{ background: '#FFF0F0', border: '1px solid #FFB3B3' }}>
-              <div className="w-2 h-2 rounded-full flex-shrink-0 mt-1" style={{ background: '#E60000' }} />
+            <div className="flex items-start gap-3 rounded-lg px-4 py-3 mb-5"
+              style={{ background: '#FFF0F0', border: '1px solid #FFB3B3' }}>
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#E60000' }} />
               <div>
                 <p className="text-sm font-medium" style={{ color: '#B30000' }}>Authentication required</p>
-                <button onClick={onSignInClick} className="text-xs underline mt-0.5" style={{ color: '#E60000' }}>Sign in with Google</button>
+                <button onClick={onSignInClick} className="text-xs underline mt-0.5" style={{ color: '#E60000' }}>
+                  Sign in with Google
+                </button>
               </div>
             </div>
           )}
 
-          <button onClick={onStartRun} disabled={isRunning || !token || !user} className="btn-lg btn-primary gap-2" style={{ opacity: (isRunning || !token || !user) ? 0.4 : 1 }}>
+          <button
+            onClick={onStartRun}
+            disabled={isRunning || !token || !user}
+            className="btn-lg btn-primary gap-2"
+            style={{ opacity: (isRunning || !token || !user) ? 0.4 : 1 }}
+          >
             <Play className="w-4 h-4" />
             {isRunning ? 'Starting…' : (!token || !user ? 'Sign in required' : 'Start training')}
           </button>
@@ -155,11 +170,13 @@ export default function RunMonitor({ run, config, onRunComplete, onStartRun, isR
       <div className="card p-6">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4" style={{ color: '#BDBDBD' }} />
+            <Cpu className="w-4 h-4" style={{ color: '#BDBDBD' }} />
             <h2 className="section-title">Training monitor</h2>
           </div>
-          <div className="flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full" style={{ background: sc.bg, color: sc.color }}>
-            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: sc.dot, animation: sc.pulse ? 'pulse 2s infinite' : 'none' }} />
+          <div className="flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full"
+            style={{ background: sc.bg, color: sc.color, border: '1px solid #EBEBEB' }}>
+            <span className="w-2 h-2 rounded-full flex-shrink-0"
+              style={{ background: sc.dot, animation: sc.pulse ? 'pulse 1.5s cubic-bezier(0.4,0,0.6,1) infinite' : 'none' }} />
             {sc.label}
           </div>
         </div>
@@ -168,13 +185,16 @@ export default function RunMonitor({ run, config, onRunComplete, onStartRun, isR
 
         <div className="grid grid-cols-3 gap-4 mt-4">
           {[
-            ['Run ID',       run.run_id,          '#0891B2'],
-            ['Epochs',       metrics.length,       '#9333EA'],
-            ['Explanations', explanations.length,  '#D97706'],
-          ].map(([l, v, c]) => (
-            <div key={l} className="card p-4" style={{ borderLeft: `3px solid ${c}` }}>
-              <p className="text-xs font-medium uppercase tracking-wide" style={{ color: '#737373' }}>{l}</p>
-              <p className="text-lg font-semibold mt-1 tabular-nums truncate" style={{ color: '#0D0D0D' }}>{v}</p>
+            { label: 'Run ID',       value: run.run_id,         Icon: Hash },
+            { label: 'Epochs',       value: metrics.length,      Icon: Timer },
+            { label: 'Explanations', value: explanations.length, Icon: Microscope },
+          ].map(({ label, value, Icon }) => (
+            <div key={label} className="card p-4">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Icon className="w-3.5 h-3.5" style={{ color: '#BDBDBD' }} />
+                <p className="text-xs font-medium uppercase tracking-wide" style={{ color: '#737373' }}>{label}</p>
+              </div>
+              <p className="text-lg font-semibold tabular-nums truncate" style={{ color: '#0D0D0D' }}>{value}</p>
             </div>
           ))}
         </div>
@@ -190,9 +210,11 @@ export default function RunMonitor({ run, config, onRunComplete, onStartRun, isR
               <XAxis dataKey="epoch" tick={{ fontSize: 11, fill: '#BDBDBD' }} tickLine={false} axisLine={false} />
               <YAxis tick={{ fontSize: 11, fill: '#BDBDBD' }} tickLine={false} axisLine={false} />
               <Tooltip content={<CustomTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 12, paddingTop: 16 }} />
+              <Legend wrapperStyle={{ fontSize: 12, paddingTop: 16, color: '#525252' }} />
               {visibleLines.map(l => (
-                <Line key={l.key} type="monotone" dataKey={l.key} name={l.name} stroke={l.color} strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: l.color }} />
+                <Line key={l.key} type="monotone" dataKey={l.key} name={l.name}
+                  stroke={l.color} strokeWidth={2} dot={false}
+                  activeDot={{ r: 4, strokeWidth: 0, fill: l.color }} />
               ))}
             </LineChart>
           </ResponsiveContainer>
@@ -213,19 +235,22 @@ export default function RunMonitor({ run, config, onRunComplete, onStartRun, isR
 
       <ExplanationVisualization explanations={explanations} selectedNodes={config?.explainer?.node_ids} />
 
-      {/* Logs */}
+      {/* Log console */}
       <div className="card p-6">
         <div className="flex items-center gap-2 mb-4">
-          <TerminalSquare className="w-4 h-4" style={{ color: '#BDBDBD' }} />
+          <Terminal className="w-4 h-4" style={{ color: '#BDBDBD' }} />
           <h3 className="section-title">Training logs</h3>
-          <span className="ml-auto text-xs px-2.5 py-0.5 rounded-full font-medium" style={{ background: '#F5F5F5', color: '#525252' }}>{logs.length} entries</span>
+          <span className="ml-auto text-xs px-2.5 py-0.5 rounded-full font-medium"
+            style={{ background: '#F5F5F5', color: '#525252' }}>
+            {logs.length} entries
+          </span>
         </div>
         <div ref={logsRef} className="log-block h-48 scrollbar-none">
           {logs.length === 0
             ? <span style={{ color: '#525252' }}>Waiting for training output…</span>
             : logs.map((log, i) => (
               <div key={i} className="mb-1">
-                <span style={{ color: '#D97706' }}>[{log.ts.toLocaleTimeString()}]</span>
+                <span style={{ color: '#525252' }}>[{log.ts.toLocaleTimeString()}]</span>
                 <span className="ml-2" style={{ color: '#BDBDBD' }}>{log.msg}</span>
               </div>
             ))

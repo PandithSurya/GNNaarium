@@ -12,23 +12,52 @@ export default function ExperimentHistory() {
     setLoading(true);
     try {
       const me = JSON.parse(localStorage.getItem('user') || '{}');
+      const token = localStorage.getItem('token');
       if (!me.email) { setExperiments([]); return; }
+      const deleted = JSON.parse(localStorage.getItem('deletedExperiments') || '[]');
       let list = [];
-      try { const r = await fetch('/api/experiments'); if (r.ok) { const d = await r.json(); list = d.experiments || []; } } catch {}
+      try {
+        const r = await fetch('/api/experiments', {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
+        if (r.ok) { const d = await r.json(); list = d.experiments || []; }
+      } catch {}
       try {
         const local = JSON.parse(localStorage.getItem('experimentHistory') || '[]').filter(e => e.user_email === me.email);
         const merged = [...list, ...local];
         const seen = new Set();
-        setExperiments(merged.filter(e => { const k = String(e._id || e.id); if (seen.has(k)) return false; seen.add(k); return true; }));
+        setExperiments(merged.filter(e => {
+          const k = String(e._id || e.id);
+          if (seen.has(k) || deleted.includes(k)) return false;
+          seen.add(k); return true;
+        }));
       } catch { setExperiments(list); }
     } finally { setLoading(false); }
   };
 
+  const addDeleted = (id) => {
+    const deleted = JSON.parse(localStorage.getItem('deletedExperiments') || '[]');
+    if (!deleted.includes(String(id))) {
+      deleted.push(String(id));
+      localStorage.setItem('deletedExperiments', JSON.stringify(deleted));
+    }
+  };
+
   const del = async (id) => {
-    try { await fetch(`/api/experiments/${id}`, { method: 'DELETE' }); } catch {}
-    setExperiments(prev => prev.filter(e => String(e._id || e.id) !== String(id)));
+    const token = localStorage.getItem('token');
+    try {
+      const r = await fetch(`/api/experiments/${id}`, {
+        method: 'DELETE',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      if (!r.ok) console.warn('DB delete failed:', await r.text());
+    } catch (e) { console.warn('DB delete error:', e); }
+    addDeleted(id);
     const saved = JSON.parse(localStorage.getItem('experimentHistory') || '[]');
-    localStorage.setItem('experimentHistory', JSON.stringify(saved.filter(e => String(e.id) !== String(id))));
+    localStorage.setItem('experimentHistory', JSON.stringify(
+      saved.filter(e => String(e._id || e.id) !== String(id))
+    ));
+    setExperiments(prev => prev.filter(e => String(e._id || e.id) !== String(id)));
   };
 
   const exportExp = (exp) => {
@@ -57,6 +86,9 @@ export default function ExperimentHistory() {
                 onClick={() => {
                   const me = JSON.parse(localStorage.getItem('user') || '{}');
                   const saved = JSON.parse(localStorage.getItem('experimentHistory') || '[]');
+                  const toDelete = saved.filter(e => e.user_email === me.email).map(e => String(e._id || e.id));
+                  const existing = JSON.parse(localStorage.getItem('deletedExperiments') || '[]');
+                  localStorage.setItem('deletedExperiments', JSON.stringify([...new Set([...existing, ...toDelete])]));
                   localStorage.setItem('experimentHistory', JSON.stringify(saved.filter(e => e.user_email !== me.email)));
                   setExperiments([]);
                 }}
