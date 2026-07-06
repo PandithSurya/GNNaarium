@@ -12,6 +12,8 @@ venv/
 
 # Environment variables
 .env
+frontend/.env.local
+frontend/.env.production.local
 
 # Node.js
 node_modules/

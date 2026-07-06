@@ -113,6 +113,7 @@ export default function RunMonitor({ run, config, onRunComplete, onStartRun, isR
     filtered.unshift(exp);
     localStorage.setItem('experimentHistory', JSON.stringify(filtered.slice(0, 50)));
     setTimeout(() => connectWS(run.run_id), 1000);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run?.run_id]);
 
   const sc = STATUS[status] || STATUS.idle;
