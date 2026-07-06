@@ -12,7 +12,10 @@ def backend_url():
     return os.getenv('BACKEND_URL', 'http://localhost:8000')
 
 def frontend_url():
-    return os.getenv('FRONTEND_URL', 'http://localhost:3000')
+    url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+    if not url.startswith('http'):
+        url = 'https://' + url
+    return url.rstrip('/')
 
 @router.get("/auth/test")
 async def test_oauth_config():
