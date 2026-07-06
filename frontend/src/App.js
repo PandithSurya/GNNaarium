@@ -160,10 +160,11 @@ export default function App() {
     }
   };
 
+  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://gnnaarium-backend-jrdc.onrender.com';
+
   const handleGoogleSignIn = () => {
     const redirect = currentView === 'homepage' ? '/' : '/playground';
-    window.location.href = `https://gnnaarium-backend-jrdc.onrender.com
-/auth/google/login?redirect_to=${redirect}`;
+    window.location.href = `${BACKEND_URL}/auth/google/login?redirect_to=${redirect}`;
   };
 
   const handleLogout = () => {
