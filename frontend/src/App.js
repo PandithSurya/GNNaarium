@@ -162,7 +162,8 @@ export default function App() {
 
   const handleGoogleSignIn = () => {
     const redirect = currentView === 'homepage' ? '/' : '/playground';
-    window.location.href = `http://localhost:8000/auth/google/login?redirect_to=${redirect}`;
+    window.location.href = `https://gnnaarium-backend-jrdc.onrender.com
+/auth/google/login?redirect_to=${redirect}`;
   };
 
   const handleLogout = () => {
