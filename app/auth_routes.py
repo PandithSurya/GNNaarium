@@ -36,7 +36,7 @@ async def test_oauth_config():
     }
 
 @router.get("/auth/google/login")
-async def google_login(request: Request, redirect_to: str = None):
+async def google_login(request: Request, redirect_to: str = None, origin: str = None):
     try:
         client_id = os.getenv('GOOGLE_CLIENT_ID')
         if not client_id or not os.getenv('GOOGLE_CLIENT_SECRET'):
@@ -45,15 +45,17 @@ async def google_login(request: Request, redirect_to: str = None):
         from urllib.parse import urlencode
         import base64
 
-        # Detect origin from Referer/Origin header so localhost redirects back to localhost
-        origin = None
-        referer = request.headers.get('referer') or request.headers.get('origin')
-        if referer:
-            from urllib.parse import urlparse
-            parsed = urlparse(referer)
-            origin = f"{parsed.scheme}://{parsed.netloc}"
+        # Use explicitly passed origin, fallback to Referer, fallback to FRONTEND_URL env
+        if not origin:
+            referer = request.headers.get('referer') or request.headers.get('origin')
+            if referer:
+                from urllib.parse import urlparse
+                parsed = urlparse(referer)
+                origin = f"{parsed.scheme}://{parsed.netloc}"
+        if not origin:
+            origin = frontend_url()
 
-        state_data = json.dumps({'redirect_to': redirect_to or '/', 'origin': origin or frontend_url()})
+        state_data = json.dumps({'redirect_to': redirect_to or '/', 'origin': origin})
         state = base64.b64encode(state_data.encode()).decode()
 
         params = {
@@ -73,15 +75,27 @@ async def google_login(request: Request, redirect_to: str = None):
 
 @router.get("/auth/google/callback")
 async def google_callback(request: Request):
+    # Extract origin from state first — before anything can fail
+    origin = frontend_url()
+    redirect_to = '/'
+    state = request.query_params.get('state')
+    if state:
+        try:
+            import base64
+            state_data = json.loads(base64.b64decode(state.encode()).decode())
+            redirect_to = state_data.get('redirect_to', '/')
+            origin = state_data.get('origin') or frontend_url()
+        except:
+            pass
+
     try:
         if 'error' in request.query_params:
             error = request.query_params.get('error')
-            error_description = request.query_params.get('error_description', '')
-            raise HTTPException(status_code=400, detail=f"Google OAuth error: {error} - {error_description}")
+            raise Exception(f"Google OAuth error: {error}")
 
         code = request.query_params.get('code')
         if not code:
-            raise HTTPException(status_code=400, detail="No authorization code received")
+            raise Exception("No authorization code received")
 
         import httpx
         token_data = {
@@ -100,7 +114,7 @@ async def google_callback(request: Request):
             token_json = token_response.json()
 
             if 'access_token' not in token_json:
-                raise HTTPException(status_code=400, detail="Failed to get access token")
+                raise Exception(f"Failed to get access token: {token_json}")
 
             user_response = await client.get(
                 'https://www.googleapis.com/oauth2/v2/userinfo',
@@ -109,7 +123,7 @@ async def google_callback(request: Request):
             user_info = user_response.json()
 
         if not user_info or not user_info.get('email'):
-            raise HTTPException(status_code=400, detail="Failed to get user info from Google")
+            raise Exception("Failed to get user info from Google")
 
         existing_user = await get_user_by_email(user_info['email'])
 
@@ -130,7 +144,7 @@ async def google_callback(request: Request):
             }
             user_id = await create_user(new_user_data)
             if not user_id:
-                raise HTTPException(status_code=500, detail="Failed to create user")
+                raise Exception("Failed to create user")
             jwt_token = create_jwt_token(new_user_data)
             user_data = {
                 "email": new_user_data["email"],
@@ -138,31 +152,16 @@ async def google_callback(request: Request):
                 "profile_pic": new_user_data.get("profile_pic")
             }
 
-        state = request.query_params.get('state')
-        redirect_to = '/'
-        origin = frontend_url()
-        if state:
-            try:
-                import base64
-                state_data = json.loads(base64.b64decode(state.encode()).decode())
-                redirect_to = state_data.get('redirect_to', '/')
-                origin = state_data.get('origin') or frontend_url()
-            except:
-                redirect_to = '/'
-                origin = frontend_url()
-
         import urllib.parse
         user_data_encoded = urllib.parse.quote(json.dumps(user_data))
-
+        redirect_url = f"{origin}?token={jwt_token}&user={user_data_encoded}"
         if redirect_to and redirect_to != '/':
             redirect_url = f"{origin}{redirect_to}?token={jwt_token}&user={user_data_encoded}"
-        else:
-            redirect_url = f"{origin}?token={jwt_token}&user={user_data_encoded}"
 
         return RedirectResponse(url=redirect_url)
 
     except Exception as e:
-        return RedirectResponse(url=f"{frontend_url()}?error={str(e)}")
+        return RedirectResponse(url=f"{origin}?error={str(e)}")
 
 @router.post("/auth/logout")
 async def logout():

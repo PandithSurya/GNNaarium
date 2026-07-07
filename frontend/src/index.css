@@ -50,10 +50,13 @@
   @media (min-width: 1024px) { .sidebar-overlay { display: none; } }
 
   .main-content {
-    margin-left: 240px;
+    margin-left: 0;
     transition: margin-left 250ms cubic-bezier(0.16,1,0.3,1);
   }
-  .main-content.sidebar-collapsed { margin-left: 64px; }
+  @media (min-width: 1024px) {
+    .main-content { margin-left: 240px; }
+    .main-content.sidebar-collapsed { margin-left: 64px; }
+  }
 
   /* ── Cards ───────────────────────────────────────────────── */
   .card {

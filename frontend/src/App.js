@@ -321,7 +321,7 @@ export default function App() {
 
         {/* Content */}
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-6xl mx-auto p-6 space-y-6">
+          <div className="max-w-6xl mx-auto p-3 sm:p-6 space-y-6">
 
             <div className="card p-3 hidden md:block">
               <ConfigStrip config={config} />
