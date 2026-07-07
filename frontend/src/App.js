@@ -161,10 +161,16 @@ export default function App() {
   };
 
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+  const IS_DEV = !process.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL.includes('localhost');
 
   const handleGoogleSignIn = () => {
-    const redirect = currentView === 'homepage' ? '/' : '/playground';
-    window.location.href = `${BACKEND_URL}/auth/google/login?redirect_to=${redirect}`;
+    const origin = window.location.origin;
+    if (IS_DEV) {
+      window.location.href = `${BACKEND_URL}/auth/dev-login?origin=${encodeURIComponent(origin)}`;
+    } else {
+      const redirect = currentView === 'homepage' ? '/' : '/playground';
+      window.location.href = `${BACKEND_URL}/auth/google/login?redirect_to=${redirect}&origin=${encodeURIComponent(origin)}`;
+    }
   };
 
   const handleLogout = () => {

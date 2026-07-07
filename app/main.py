@@ -33,3 +33,16 @@ app.add_middleware(
 
 app.include_router(api_router, prefix="/api")
 app.include_router(auth_router)
+
+# Dev-only bypass — only active when ENVIRONMENT != production
+if os.getenv("ENVIRONMENT") != "production":
+    from fastapi.responses import RedirectResponse
+    from app.database import create_jwt_token
+    import urllib.parse, json
+
+    @app.get("/auth/dev-login")
+    async def dev_login(origin: str = "http://localhost:3000"):
+        user_data = {"email": "dev@localhost", "name": "Dev User", "profile_pic": None}
+        token = create_jwt_token(user_data)
+        encoded = urllib.parse.quote(json.dumps(user_data))
+        return RedirectResponse(url=f"{origin}?token={token}&user={encoded}")
