@@ -45,18 +45,25 @@ async def google_login(request: Request, redirect_to: str = None):
         from urllib.parse import urlencode
         import base64
 
-        state = base64.b64encode((redirect_to or '/').encode()).decode() if redirect_to else None
+        # Detect origin from Referer/Origin header so localhost redirects back to localhost
+        origin = None
+        referer = request.headers.get('referer') or request.headers.get('origin')
+        if referer:
+            from urllib.parse import urlparse
+            parsed = urlparse(referer)
+            origin = f"{parsed.scheme}://{parsed.netloc}"
+
+        state_data = json.dumps({'redirect_to': redirect_to or '/', 'origin': origin or frontend_url()})
+        state = base64.b64encode(state_data.encode()).decode()
 
         params = {
             'client_id': client_id,
             'redirect_uri': f'{backend_url()}/auth/google/callback',
             'response_type': 'code',
             'scope': 'openid email profile',
-            'access_type': 'offline'
+            'access_type': 'offline',
+            'state': state,
         }
-
-        if state:
-            params['state'] = state
 
         auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
         return RedirectResponse(url=auth_url)
@@ -133,20 +140,24 @@ async def google_callback(request: Request):
 
         state = request.query_params.get('state')
         redirect_to = '/'
+        origin = frontend_url()
         if state:
             try:
                 import base64
-                redirect_to = base64.b64decode(state.encode()).decode()
+                state_data = json.loads(base64.b64decode(state.encode()).decode())
+                redirect_to = state_data.get('redirect_to', '/')
+                origin = state_data.get('origin') or frontend_url()
             except:
                 redirect_to = '/'
+                origin = frontend_url()
 
         import urllib.parse
         user_data_encoded = urllib.parse.quote(json.dumps(user_data))
 
         if redirect_to and redirect_to != '/':
-            redirect_url = f"{frontend_url()}{redirect_to}?token={jwt_token}&user={user_data_encoded}"
+            redirect_url = f"{origin}{redirect_to}?token={jwt_token}&user={user_data_encoded}"
         else:
-            redirect_url = f"{frontend_url()}?token={jwt_token}&user={user_data_encoded}"
+            redirect_url = f"{origin}?token={jwt_token}&user={user_data_encoded}"
 
         return RedirectResponse(url=redirect_url)
 
