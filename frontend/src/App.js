@@ -160,7 +160,7 @@ export default function App() {
     }
   };
 
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://gnnaarium-backend-jrdc.onrender.com';
+  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 
   const handleGoogleSignIn = () => {
     const redirect = currentView === 'homepage' ? '/' : '/playground';

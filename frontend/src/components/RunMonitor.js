@@ -64,7 +64,7 @@ export default function RunMonitor({ run, config, onRunComplete, onStartRun, isR
         const final = currentMetric || metrics[metrics.length - 1] || null;
         if (final && run?.run_id) saveHistory(final);
         setTimeout(() => {
-          setMetrics([]); setLogs([]); setExplanations([]); setCurrentMetric(null);
+          setMetrics([]); setLogs([]); setCurrentMetric(null);
           setStatus('idle'); wsRef.current = null; onRunComplete?.(final);
         }, 2500);
       };
@@ -86,9 +86,16 @@ export default function RunMonitor({ run, config, onRunComplete, onStartRun, isR
         if (i !== -1) { h[i].results = { val_acc: m.val_acc, train_loss: m.train_loss }; localStorage.setItem('experimentHistory', JSON.stringify(h)); }
       }
     } else if (data.type === 'explanation') {
-      if (data.explanation) setExplanations(prev => [...prev, data.explanation]);
-      else if (data.explanations) setExplanations(data.explanations);
-      setLogs(prev => [...prev, { ts: new Date(), msg: `Explainer ${data.explainer} completed for node ${data.explanation?.node_idx ?? 'N/A'}` }]);
+      if (data.explanations) {
+        setExplanations(data.explanations);
+      } else if (data.explanation) {
+        setExplanations(prev => {
+          const idx = prev.findIndex(e => e.node_idx === data.explanation.node_idx && e.method === data.explanation.method);
+          if (idx !== -1) { const next = [...prev]; next[idx] = data.explanation; return next; }
+          return [...prev, data.explanation];
+        });
+      }
+      setLogs(prev => [...prev, { ts: new Date(), msg: `Explainer ${data.explainer || data.explanation?.method} completed for node ${data.explanation?.node_idx ?? 'N/A'}` }]);
     } else if (data.type === 'status') {
       setStatus(data.status);
     }

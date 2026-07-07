@@ -78,16 +78,16 @@ function buildNarrative(exp, topFeatures, topEdges) {
 }
 
 export default function ExplanationVisualization({ explanations }) {
-  const [selected, setSelected] = useState(null);
+  const [selectedIdx, setSelectedIdx] = useState(0);
   const [view, setView] = useState('visual');
 
   useEffect(() => {
-    if (explanations?.length) setSelected(explanations[0]);
+    if (explanations?.length) setSelectedIdx(0);
   }, [explanations]);
 
   if (!explanations?.length) return null;
 
-  const exp = selected;
+  const exp = explanations[selectedIdx] || explanations[0];
 
   const features = exp?.feature_importance || exp?.attributions || [];
   const topFeatures = features.length
@@ -128,9 +128,9 @@ export default function ExplanationVisualization({ explanations }) {
             <div className="flex items-center gap-1 p-1 rounded-lg" style={{ background: '#F5F5F5' }}>
               {explanations.map((e, idx) => {
                 const label = e.task_type === 'graph' ? 'Graph' : `Node ${e.node_idx ?? idx}`;
-                const active = selected?.node_idx === e.node_idx && selected?.method === e.method;
+                const active = selectedIdx === idx;
                 return (
-                  <button key={idx} onClick={() => setSelected(e)} className="btn-sm"
+                  <button key={idx} onClick={() => setSelectedIdx(idx)} className="btn-sm"
                     style={{
                       background: active ? '#FFFFFF' : 'transparent',
                       color: active ? '#0D0D0D' : '#737373',
